@@ -1,92 +1,152 @@
 # ZK-100 — Rules of the Game
 
-## 🎮 Overview
-You are programming a grid of **tiny compute nodes** to transform an **input stream** of numbers into an **output stream** according to the challenge specification.  
+## Overview
 
-- Each node runs a small **assembly-like program** you write.  
-- The programs all run **in parallel**, cycle by cycle.  
-- Nodes can talk to their neighbors using message ports, and some nodes connect to the outside world (`IN`, `OUT`).  
-- Your score depends on **how efficient** your solution is (cycles, messages, and nodes used).  
+ZK-100 is a parallel programming puzzle game where you program a grid of **tiny compute nodes** to transform an **input stream** into an **output stream** according to challenge specifications.
+
+### Key Concepts
+- Each node runs a small **assembly-like program** you write
+- All programs execute **in parallel**, cycle by cycle
+- Nodes communicate via message ports with neighbors
+- Special nodes connect to the outside world (`IN`, `OUT`)
+- Your score reflects **solution efficiency** (cycles, messages, nodes)
 
 ---
 
-## Grid & Nodes
-- The grid is **2 × 2** = 4 nodes.  
-- Each node has:
-  - **Registers**
-    - `ACC` (main register, integer)
-    - `BAK` (backup register, integer)
-    - `LAST` (remembers last port used for `MOV`)
-    - Flags: `Z` (ACC == 0), `N` (ACC < 0)
-  - **Program** of up to 32 instructions
-  - **Program Counter** (`PC`) to track the current line
+## Grid Architecture
 
-Special roles:
-- Node `(0,0)` has access to **IN** (reads numbers from the challenge input stream).
-- Node `(1,1)` has access to **OUT** (writes numbers to the challenge output stream).
+### Layout
+- **Grid Size**: 2×2 (4 nodes total)
+- **Node Coordinates**: (0,0), (0,1), (1,0), (1,1)
+
+### Node Components
+Each node contains:
+
+#### Registers
+| Register | Purpose | Type |
+|----------|---------|------|
+| `ACC` | Main accumulator register | Integer |
+| `BAK` | Backup storage register | Integer |
+| `LAST` | Stores last port used for `MOV` | Port reference |
+
+#### Flags
+- `Z` flag: Set when ACC = 0
+- `N` flag: Set when ACC < 0
+
+#### Program Storage
+- Up to **32 instructions** per node
+- **Program Counter (PC)** tracks current instruction
+
+### Special Node Roles
+- **Node (0,0)**: Has `IN` port (reads from input stream)
+- **Node (1,1)**: Has `OUT` port (writes to output stream)
 
 ---
 
 ## Execution Model
-The machine runs in **lock-step cycles**.  
 
-Each cycle:
-1. Every non-halted node reads its current instruction.
-2. If the instruction is **non-blocking** (math, jumps, NOP, etc.) → execute immediately.
-3. If the instruction is **MOV with a port**:
-   - It may **block** until the corresponding neighbor is ready the same cycle.
-   - Example: Node A does `MOV ACC, RIGHT`, Node B does `MOV LEFT, ACC` → transfer succeeds, both advance.
-   - If no match, the node **waits** (does not advance PC).
-4. After execution, program counters update (`PC + 1` or jump target).
-5. A node with `HLT` becomes inert forever.
+The ZK-100 operates in **lock-step cycles** where all nodes execute simultaneously.
 
-The system halts when **all nodes are halted**.  
-If every non-halted node is blocked in the same cycle → **deadlock** (program stuck).
+### Cycle Execution Steps
+
+1. **Instruction Read**: Every non-halted node reads its current instruction
+2. **Execution Phase**:
+   - **Non-blocking instructions** (math, jumps, NOP) → Execute immediately
+   - **MOV with ports** → May block until communication partner is ready
+3. **Communication Matching**:
+   - Example: Node A executes `MOV ACC, RIGHT` while Node B executes `MOV LEFT, ACC`
+   - Result: Transfer succeeds, both nodes advance
+   - If no match: Node waits (PC doesn't advance)
+4. **PC Update**: Increment or jump to target
+5. **Halt Check**: Nodes with `HLT` become permanently inactive
+
+### System States
+- **Running**: At least one node is active
+- **Halted**: All nodes have executed `HLT`
+- **Deadlocked**: All active nodes are blocked (system stuck)
 
 ---
 
-## Communication
-- **Ports:** `UP`, `DOWN`, `LEFT`, `RIGHT`, `LAST`  
-- **Special ports:**
-  - `IN` (only at `(0,0)`): reads next input value. Blocks if no value left.
-  - `OUT` (only at `(1,1)`): writes to output. Never blocks (unbounded).
-  - `NIL`: fake port. As `SRC` → 0; as `DST` → discard. Never blocks.
-- **Channels:** between adjacent nodes. Each channel is **1-slot**. Transfers succeed only if both sides match in the same cycle.
+## Communication System
+
+### Port Types
+
+#### Directional Ports
+- `UP`, `DOWN`, `LEFT`, `RIGHT` - Connect to adjacent nodes
+- `LAST` - References the last port used in a `MOV` operation
+
+#### Special Ports
+| Port | Location | Function | Blocking |
+|------|----------|----------|----------|
+| `IN` | Node (0,0) only | Reads input stream | Blocks when empty |
+| `OUT` | Node (1,1) only | Writes to output | Never blocks |
+| `NIL` | All nodes | Null port (returns 0/discards) | Never blocks |
+
+### Channel Properties
+- Each channel between nodes has **1-slot capacity**
+- Transfers require **simultaneous matching** operations
+- Unmatched operations cause the initiating node to **block**
 
 ---
 
 ## Instruction Set
-MOV SRC, DST ; move a value from SRC to DST
-ADD SRC ; ACC += SRC
-SUB SRC ; ACC -= SRC
-NEG ; ACC = -ACC
 
-SAV ; BAK = ACC
-SWP ; swap ACC <-> BAK
+### Data Movement
+```asm
+MOV SRC, DST    ; Move value from source to destination
+```
 
-JMP LABEL ; unconditional jump
-JZ LABEL ; jump if ACC == 0
-JNZ LABEL ; jump if ACC != 0
-JGZ LABEL ; jump if ACC > 0
-JLZ LABEL ; jump if ACC < 0
+### Arithmetic Operations
+```asm
+ADD SRC         ; ACC = ACC + SRC
+SUB SRC         ; ACC = ACC - SRC
+NEG             ; ACC = -ACC
+```
 
-NOP ; do nothing
-HLT ; halt this node
+### Register Management
+```asm
+SAV             ; BAK = ACC (save accumulator)
+SWP             ; Swap ACC ↔ BAK
+```
 
-markdown
-Copy code
+### Control Flow
+```asm
+JMP LABEL       ; Unconditional jump
+JZ  LABEL       ; Jump if ACC == 0
+JNZ LABEL       ; Jump if ACC != 0
+JGZ LABEL       ; Jump if ACC > 0
+JLZ LABEL       ; Jump if ACC < 0
+```
 
-- **Sources (SRC):** `ACC`, `LITERAL`, `NIL`, `IN`, `PORT`, `LAST`  
-- **Destinations (DST):** `ACC`, `NIL`, `OUT`, `PORT`, `LAST`  
-- **Blocking rules:**  
-  - Using a **port/IN/OUT/LAST** can block.  
-  - `NIL` and `ACC` never block.
+### System Control
+```asm
+NOP             ; No operation (advance PC only)
+HLT             ; Halt this node permanently
+```
+
+### Operand Types
+
+**Sources (SRC)**:
+- `ACC` - Accumulator value
+- `[number]` - Literal integer
+- `NIL` - Always returns 0
+- `IN` - Input stream (node 0,0 only)
+- `[PORT]` - Port value
+- `LAST` - Last used port
+
+**Destinations (DST)**:
+- `ACC` - Accumulator
+- `NIL` - Discard value
+- `OUT` - Output stream (node 1,1 only)
+- `[PORT]` - Send to port
+- `LAST` - Last used port
 
 ---
 
-## Assembly Layout
-Programs are defined **per node**:
+## Program Structure
 
+### Assembly Format
+```asm
 #NODE 0,0
 MOV IN, RIGHT
 HLT
@@ -95,58 +155,85 @@ HLT
 MOV LEFT, DOWN
 HLT
 
+#NODE 1,0
+MOV UP, RIGHT
+HLT
+
 #NODE 1,1
 loop:
-MOV UP, ACC
-ADD 1
-MOV ACC, OUT
-JMP loop
+    MOV LEFT, ACC
+    ADD 1
+    MOV ACC, OUT
+    JMP loop
+```
 
-yaml
-Copy code
-
-This program reads numbers from input, routes them through, increments each, and outputs the results.
-
----
-
-## Scoring
-Every valid run produces:
-- **Cycles**: total lock-step cycles until halt.  
-- **Messages**: number of successful inter-node transfers.  
-- **Nodes used**: nodes with ≥1 non-NOP instruction.  
-
-**Example score formula:**
-score = cycles + 5 * nodes_used + messages / 4
-
-yaml
-Copy code
-Leaderboards can rank by lowest score.
+### Labels
+- Define with `label:` syntax
+- Jump targets for control flow
+- Scoped to individual nodes
 
 ---
 
-## Challenges
-A **challenge** provides:
-- `seed`: generates the input stream
-- `expected output`: what must appear on OUT
+## Scoring System
 
-Your program must transform the inputs into the correct outputs.  
-Correctness can be verified by running the interpreter or by generating a **zk proof** that your program yields the same output + score.
+### Metrics
+1. **Cycles**: Total clock cycles until system halt
+2. **Messages**: Count of successful inter-node transfers
+3. **Nodes Used**: Nodes containing non-NOP instructions
+
+### Score Calculation
+```
+score = cycles + (5 × nodes_used) + (messages ÷ 4)
+```
+
+Lower scores indicate more efficient solutions.
+
+---
+
+## Challenge Format
+
+### Challenge Components
+- **Seed**: Generates deterministic input stream
+- **Expected Output**: Required output sequence
+- **Verification**: Via interpreter or ZK proof
+
+### Example Challenge
+**Task**: Increment each input by 1
+
+**Input Stream**: `[3, 5, -1]`  
+**Expected Output**: `[4, 6, 0]`
+
+**Solution Metrics**:
+- Cycles: 60
+- Nodes Used: 3
+- Messages: 9
+- **Final Score**: 60 + (5×3) + (9÷4) = 77.25
 
 ---
 
-## Example Run
-**Challenge:** For each input number `x`, output `x+1`.
+## Quick Reference
 
-- Input: `[3, 5, -1]`  
-- Expected output: `[4, 6, 0]`  
+### Blocking Operations
+- ✅ Never blocks: `ACC`, `NIL`, literals
+- ⚠️ May block: Ports, `IN`, `LAST`
+- ❌ Always blocks when empty: `IN`
 
-Program above produces exactly that.  
+### Common Patterns
+```asm
+; Pass-through
+MOV LEFT, RIGHT
 
-Suppose it takes:
-- 60 cycles  
-- 3 nodes  
-- 9 messages  
+; Accumulate and forward
+MOV LEFT, ACC
+ADD ACC
+MOV ACC, RIGHT
 
-Score = `60 + 5*3 + 9/4 = 75.25`.
-
----
+; Conditional routing
+MOV LEFT, ACC
+JGZ positive
+MOV ACC, DOWN
+JMP done
+positive:
+MOV ACC, UP
+done:
+```
