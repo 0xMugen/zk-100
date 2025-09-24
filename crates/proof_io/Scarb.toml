@@ -1,11 +1,10 @@
 [package]
-name = "zk100_exec"
+name = "zk100_proof_io"
 version = "0.1.0"
 edition = "2024_07"
 
 [dependencies]
 zk100_vm = { path = "../vm" }
-zk100_proof_io = { path = "../proof_io" }
 
 [lib]
 

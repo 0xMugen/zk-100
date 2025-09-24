@@ -2,14 +2,6 @@
 version = 1
 
 [[package]]
-name = "zk100_exec"
-version = "0.1.0"
-dependencies = [
- "zk100_proof_io",
- "zk100_vm",
-]
-
-[[package]]
 name = "zk100_proof_io"
 version = "0.1.0"
 dependencies = [
