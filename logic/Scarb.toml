@@ -1,0 +1,12 @@
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2024_07"
+
+[dependencies]
+cairo_execute = "2.12.0"
+
+[executable]
+
+[cairo]
+enable-gas = false
