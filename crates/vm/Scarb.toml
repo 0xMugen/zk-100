@@ -1,0 +1,11 @@
+[package]
+name = "zk100_vm"
+version = "0.1.0"
+edition = "2024_07"
+
+[dependencies]
+
+[lib]
+
+[cairo]
+enable-gas = false
