@@ -1,105 +1,47 @@
 {
-  description = "S-Two Cairo Prover Development Environment";
+  description = "zk-100";
 
   inputs = {
+    flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    flake-utils.url = "github:numtide/flake-utils";
+    cairo-nix.url = "github:knownasred/cairo-nix";
+    devshell.url = "github:numtide/devshell";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
+  outputs = inputs @ {flake-parts, ...}:
+    flake-parts.lib.mkFlake {inherit inputs;} {
+      imports = [
+        inputs.devshell.flakeModule
+      ];
 
-        # Define Rust toolchain based on cairo-prove requirements
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" ];
-        };
+      systems = ["x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin"];
+      perSystem = {
+        config,
+        self',
+        inputs',
+        pkgs,
+        system,
+        ...
+      }: {
+        # Per-system attributes can be defined here. The self' and inputs'
+        # module parameters provide easy access to attributes of the same
+        # system.
 
-        # Scarb package definition
-        scarb = pkgs.stdenv.mkDerivation rec {
-          pname = "scarb";
-          version = "2.10.0";
-          
-          src = pkgs.fetchurl {
-            url = "https://github.com/software-mansion/scarb/releases/download/v${version}/scarb-v${version}-${pkgs.stdenv.hostPlatform.system}.tar.gz";
-            sha256 = ""; # Will need to be filled with actual hash
-          };
+        # Equivalent to  inputs'.nixpkgs.legacyPackages.hello;
+        devshells.default = {
+          packages = [
+            inputs'.cairo-nix.packages.scarb
+            inputs'.cairo-nix.packages.starkli
 
-          installPhase = ''
-            mkdir -p $out/bin
-            cp scarb $out/bin/
-            chmod +x $out/bin/scarb
-          '';
-        };
-
-      in
-      {
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            # Rust toolchain
-            rustToolchain
-            pkg-config
-            openssl
-            
-            # Build tools
-            gcc
-            gnumake
-            cmake
-            
-            # Cairo and S-Two dependencies
-            scarb
-            
-            # Version control
-            git
-            
-            # Development utilities
-            ripgrep
-            fd
-            jq
-            
-            # Python (for any scripts)
-            python3
-            python3Packages.pip
-            
-            # ASDF for Scarb management (optional)
-            asdf-vm
+            pkgs.rustc
+            pkgs.cargo
           ];
-
-          shellHook = ''
-            echo "S-Two Cairo Prover Development Environment"
-            echo "==========================================="
-            echo ""
-            echo "Rust version: $(rustc --version)"
-            echo "Cargo version: $(cargo --version)"
-            echo ""
-            echo "To get started:"
-            echo "  1. Clone the S-Two Cairo repository:"
-            echo "     git clone https://github.com/starkware-libs/stwo-cairo.git"
-            echo "  2. Navigate to cairo-prove directory:"
-            echo "     cd stwo-cairo/cairo-prove"
-            echo "  3. Build the project:"
-            echo "     ./build.sh"
-            echo "  4. Install cairo-prove to PATH (optional):"
-            echo "     sudo cp target/release/cairo-prove /usr/local/bin/"
-            echo ""
-            echo "For the latest Scarb nightly:"
-            echo "  asdf plugin add scarb"
-            echo "  asdf install scarb latest:nightly"
-            echo "  asdf set -u scarb latest:nightly"
-            echo ""
-            
-            # Set up environment variables
-            export RUST_SRC_PATH="${rustToolchain}/lib/rustlib/src/rust/library"
-          '';
-
-          # Environment variables
-          OPENSSL_NO_VENDOR = 1;
-          RUST_BACKTRACE = 1;
         };
-      });
+      };
+      flake = {
+        # The usual flake attributes can be defined here, including system-
+        # agnostic ones like nixosModule and system-enumerating ones, although
+        # those are more easily expressed in perSystem.
+      };
+    };
 }
