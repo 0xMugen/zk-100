@@ -1,0 +1,38 @@
+# Nix
+result
+result-*
+.direnv/
+
+# S-Two Cairo build artifacts
+stwo-cairo/
+target/
+*.json
+
+# Cairo/Scarb
+*.casm
+*.casm.json
+*.sierra
+*.sierra.json
+*.executable.json
+
+# Proof files
+*_proof.json
+*.proof
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Logs
+*.log
