@@ -35,9 +35,9 @@ pub fn generate_args(
     Ok(args)
 }
 
-/// Convert u32 to JSON value
+/// Convert u32 to JSON value in hex format
 fn json_value_from_u32(val: u32) -> Value {
-    Value::String(format!("{}", val))
+    Value::String(format!("0x{:x}", val))
 }
 
 /// Convert bytes to felt252 hex string
@@ -61,10 +61,10 @@ mod tests {
         
         // Should have: [0, 0, merkle_root, 0]
         assert_eq!(args.len(), 4);
-        assert_eq!(args[0], Value::String("0".to_string())); // inputs len
-        assert_eq!(args[1], Value::String("0".to_string())); // expected len
+        assert_eq!(args[0], Value::String("0x0".to_string())); // inputs len
+        assert_eq!(args[1], Value::String("0x0".to_string())); // expected len
         assert!(args[2].as_str().unwrap().starts_with("0x")); // merkle root
-        assert_eq!(args[3], Value::String("0".to_string())); // prog_words len
+        assert_eq!(args[3], Value::String("0x0".to_string())); // prog_words len
     }
 
     #[test]
@@ -78,18 +78,18 @@ mod tests {
         
         // Should have: [3, 1, 2, 3, 2, 10, 20, merkle_root, 4, 100, 200, 300, 400]
         assert_eq!(args.len(), 13);
-        assert_eq!(args[0], Value::String("3".to_string())); // inputs len
-        assert_eq!(args[1], Value::String("1".to_string()));
-        assert_eq!(args[2], Value::String("2".to_string()));
-        assert_eq!(args[3], Value::String("3".to_string()));
-        assert_eq!(args[4], Value::String("2".to_string())); // expected len
-        assert_eq!(args[5], Value::String("10".to_string()));
-        assert_eq!(args[6], Value::String("20".to_string()));
+        assert_eq!(args[0], Value::String("0x3".to_string())); // inputs len
+        assert_eq!(args[1], Value::String("0x1".to_string()));
+        assert_eq!(args[2], Value::String("0x2".to_string()));
+        assert_eq!(args[3], Value::String("0x3".to_string()));
+        assert_eq!(args[4], Value::String("0x2".to_string())); // expected len
+        assert_eq!(args[5], Value::String("0xa".to_string()));
+        assert_eq!(args[6], Value::String("0x14".to_string()));
         assert_eq!(args[7], Value::String("0x12345678".to_string())); // merkle root
-        assert_eq!(args[8], Value::String("4".to_string())); // prog_words len
-        assert_eq!(args[9], Value::String("100".to_string()));
-        assert_eq!(args[10], Value::String("200".to_string()));
-        assert_eq!(args[11], Value::String("300".to_string()));
-        assert_eq!(args[12], Value::String("400".to_string()));
+        assert_eq!(args[8], Value::String("0x4".to_string())); // prog_words len
+        assert_eq!(args[9], Value::String("0x64".to_string()));
+        assert_eq!(args[10], Value::String("0xc8".to_string()));
+        assert_eq!(args[11], Value::String("0x12c".to_string()));
+        assert_eq!(args[12], Value::String("0x190".to_string()));
     }
 }
