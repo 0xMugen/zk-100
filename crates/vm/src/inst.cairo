@@ -17,7 +17,7 @@ pub enum Op {
     Hlt,
 }
 
-#[derive(Copy, Drop)]
+#[derive(Copy, Drop, PartialEq)]
 pub enum PortTag {
     Up,
     Down,

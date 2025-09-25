@@ -18,5 +18,6 @@ pub use public::{
     commit_outputs, 
     commit_challenge,
     serialize_public_outputs, 
-    deserialize_public_outputs
+    deserialize_public_outputs,
+    encode_instruction
 };

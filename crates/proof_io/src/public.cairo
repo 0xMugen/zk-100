@@ -131,34 +131,75 @@ pub fn deserialize_public_outputs(data: @Array<felt252>) -> Option<PublicOutputs
 
 // Helper functions for encoding
 
-fn encode_instruction(inst: @Inst) -> felt252 {
-    // Simple encoding - in production would need proper serialization
-    // Combine op (4 bits), src type (4 bits), dst type (4 bits), and values
+pub fn encode_instruction(inst: @Inst) -> felt252 {
+    // Enhanced encoding to preserve port directions and literal values
+    // Format: lit(8) | src_port(2) | dst_port(2) | op(4) | src(3) | dst(3) = 22 bits used
     let op_val = op_to_u32(*inst.op);
     let src_val = src_to_u32(*inst.src);
     let dst_val = dst_to_u32(*inst.dst);
     
-    // Pack into single felt252
-    let result: felt252 = (op_val * 0x10000 + src_val * 0x100 + dst_val).into();
+    // Get literal value (for Src::Lit or jump targets)
+    let lit_val: u32 = match inst.src {
+        Src::Lit(val) => *val,
+        _ => match inst.dst {
+            // For jumps, the target is in src as a literal
+            Dst::Nil => match inst.src {
+                Src::Lit(val) => *val,
+                _ => 0,
+            },
+            _ => 0,
+        },
+    };
+    
+    // Get port directions
+    let src_port: u32 = match inst.src {
+        Src::P(port) => port_tag_to_u32(*port),
+        _ => 0,
+    };
+    
+    let dst_port: u32 = match inst.dst {
+        Dst::P(port) => port_tag_to_u32(*port),
+        _ => 0,
+    };
+    
+    // Pack into felt252: lit << 24 | src_port << 22 | dst_port << 20 | op << 16 | src << 8 | dst
+    let result: felt252 = (
+        lit_val * 0x1000000 +      // bits 24-31 (8 bits for literal)
+        src_port * 0x400000 +       // bits 22-23 (2 bits for src port)
+        dst_port * 0x100000 +       // bits 20-21 (2 bits for dst port)
+        op_val * 0x10000 +          // bits 16-19 (4 bits for op)
+        src_val * 0x100 +           // bits 8-15  (8 bits for src type)
+        dst_val                     // bits 0-7   (8 bits for dst type)
+    ).into();
     result
+}
+
+// Convert port tag to u32 for encoding
+fn port_tag_to_u32(port: PortTag) -> u32 {
+    match port {
+        PortTag::Up => 0,
+        PortTag::Down => 1,
+        PortTag::Left => 2,
+        PortTag::Right => 3,
+    }
 }
 
 // Convert types to u32 for encoding (simplified)
 fn op_to_u32(op: Op) -> u32 {
     match op {
-        Op::Mov => 0,
-        Op::Add => 1,
-        Op::Sub => 2,
-        Op::Neg => 3,
-        Op::Sav => 4,
-        Op::Swp => 5,
-        Op::Jmp => 6,
-        Op::Jz => 7,
-        Op::Jnz => 8,
-        Op::Jgz => 9,
-        Op::Jlz => 10,
-        Op::Nop => 11,
-        Op::Hlt => 12,
+        Op::Mov => 1,
+        Op::Add => 2,
+        Op::Sub => 3,
+        Op::Neg => 4,
+        Op::Sav => 5,
+        Op::Swp => 6,
+        Op::Jmp => 7,
+        Op::Jz => 8,
+        Op::Jnz => 9,
+        Op::Jgz => 10,
+        Op::Jlz => 11,
+        Op::Nop => 12,
+        Op::Hlt => 13,
     }
 }
 
@@ -185,14 +226,13 @@ fn dst_to_u32(dst: Dst) -> u32 {
 
 // Helper conversions (simplified - in production would use proper libraries)
 fn felt252_to_u64(val: felt252) -> u64 {
-    // Very simplified - assumes value fits
-    // In real implementation would need proper conversion
-    0_u64  // Placeholder
+    // Assumes value fits in u64
+    val.try_into().unwrap()
 }
 
 fn felt252_to_u32(val: felt252) -> u32 {
-    // Very simplified - assumes value fits
-    0_u32  // Placeholder
+    // Assumes value fits in u32
+    val.try_into().unwrap()
 }
 
 #[cfg(test)]
@@ -384,19 +424,19 @@ mod tests {
     #[test]
     fn test_op_to_u32() {
         // Test operation enum conversion
-        assert_eq!(op_to_u32(Op::Mov), 0, "Mov should be 0");
-        assert_eq!(op_to_u32(Op::Add), 1, "Add should be 1");
-        assert_eq!(op_to_u32(Op::Sub), 2, "Sub should be 2");
-        assert_eq!(op_to_u32(Op::Neg), 3, "Neg should be 3");
-        assert_eq!(op_to_u32(Op::Sav), 4, "Sav should be 4");
-        assert_eq!(op_to_u32(Op::Swp), 5, "Swp should be 5");
-        assert_eq!(op_to_u32(Op::Jmp), 6, "Jmp should be 6");
-        assert_eq!(op_to_u32(Op::Jz), 7, "Jz should be 7");
-        assert_eq!(op_to_u32(Op::Jnz), 8, "Jnz should be 8");
-        assert_eq!(op_to_u32(Op::Jgz), 9, "Jgz should be 9");
-        assert_eq!(op_to_u32(Op::Jlz), 10, "Jlz should be 10");
-        assert_eq!(op_to_u32(Op::Nop), 11, "Nop should be 11");
-        assert_eq!(op_to_u32(Op::Hlt), 12, "Hlt should be 12");
+        assert_eq!(op_to_u32(Op::Mov), 1, "Mov should be 1");
+        assert_eq!(op_to_u32(Op::Add), 2, "Add should be 2");
+        assert_eq!(op_to_u32(Op::Sub), 3, "Sub should be 3");
+        assert_eq!(op_to_u32(Op::Neg), 4, "Neg should be 4");
+        assert_eq!(op_to_u32(Op::Sav), 5, "Sav should be 5");
+        assert_eq!(op_to_u32(Op::Swp), 6, "Swp should be 6");
+        assert_eq!(op_to_u32(Op::Jmp), 7, "Jmp should be 7");
+        assert_eq!(op_to_u32(Op::Jz), 8, "Jz should be 8");
+        assert_eq!(op_to_u32(Op::Jnz), 9, "Jnz should be 9");
+        assert_eq!(op_to_u32(Op::Jgz), 10, "Jgz should be 10");
+        assert_eq!(op_to_u32(Op::Jlz), 11, "Jlz should be 11");
+        assert_eq!(op_to_u32(Op::Nop), 12, "Nop should be 12");
+        assert_eq!(op_to_u32(Op::Hlt), 13, "Hlt should be 13");
     }
 
     #[test]

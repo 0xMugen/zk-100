@@ -12,7 +12,6 @@ cairo_execute = "2.12.0"
 
 [executable]
 
-
 [cairo]
 enable-gas = false
 
