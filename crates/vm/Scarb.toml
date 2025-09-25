@@ -3,13 +3,11 @@ name = "zk100_vm"
 version = "0.1.0"
 edition = "2024_07"
 
-[dependencies]
-cairo = "2.12.0"
-
 [lib]
 
 [cairo]
 enable-gas = false
 
 [dev-dependencies]
+cairo_test = "2.12.0"
 assert_macros = "2.12.0"

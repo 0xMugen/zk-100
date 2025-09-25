@@ -18,6 +18,4 @@ enable-gas = false
 
 [dev-dependencies]
 assert_macros = "2.12.0"
-
-[scripts]
-test = "echo 'Tests would run here with cairo-test or snforge if installed'"
+cairo_test = "2.12.0"

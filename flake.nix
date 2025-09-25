@@ -35,9 +35,15 @@
             # Pinned Rust toolchain (includes rustc + cargo)
             rust
           ];
+
+          env = [
+            {
+              name = "PATH";
+              eval = "$PWD/stwo-cairo/cairo-prove/target/release:$PWD/.starknet-foundry/target/release:$PATH";
+            }
+          ];
         };
       };
-
       flake = { };
     };
 }
