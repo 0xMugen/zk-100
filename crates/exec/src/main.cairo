@@ -246,3 +246,219 @@ fn count_nodes_used(programs: @Array<Array<Array<Inst>>>) -> u32 {
     }
     count
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::array::ArrayTrait;
+    use core::option::Option;
+
+    #[test]
+    fn test_decode_instruction() {
+        // Test instruction decoding (simplified version)
+        let inst = decode_instruction(12345);
+        match inst.op {
+            Op::Nop => assert!(true, "Decoded instruction should be NOP"),
+            _ => assert!(false, "Expected NOP instruction"),
+        }
+    }
+
+    #[test]
+    fn test_decode_programs_empty() {
+        // Test decoding empty program words
+        let empty_words = ArrayTrait::new();
+        let programs = decode_programs(@empty_words);
+        
+        assert_eq!(programs.len(), GRID_H, "Should have correct grid height");
+        
+        // Check all positions have programs (even if empty)
+        let mut r = 0;
+        while r < programs.len() {
+            match programs.get(r) {
+                Option::Some(row) => {
+                    assert_eq!(row.unbox().len(), GRID_W, "Row should have correct width");
+                },
+                Option::None => assert!(false, "Row should exist"),
+            }
+            r += 1;
+        }
+    }
+
+    #[test]
+    fn test_load_programs() {
+        // Test loading programs into grid
+        let mut grid = create_empty_grid();
+        
+        // Create test programs
+        let mut programs = ArrayTrait::new();
+        let mut row0 = ArrayTrait::new();
+        let mut prog00 = ArrayTrait::new();
+        prog00.append(Inst { op: Op::Add, src: Src::Lit(5), dst: Dst::Nil });
+        row0.append(prog00);
+        row0.append(ArrayTrait::new()); // Empty at (0,1)
+        
+        let mut row1 = ArrayTrait::new();
+        row1.append(ArrayTrait::new()); // Empty at (1,0)
+        row1.append(ArrayTrait::new()); // Empty at (1,1)
+        
+        programs.append(row0);
+        programs.append(row1);
+        
+        load_programs(ref grid, @programs);
+        
+        // Verify programs were loaded
+        match get_program(@grid, 0, 0) {
+            Option::Some(prog) => {
+                assert_eq!(prog.len(), 1, "Program should have 1 instruction");
+            },
+            Option::None => assert!(false, "Program should exist at (0,0)"),
+        }
+    }
+
+    #[test]
+    fn test_load_inputs() {
+        // Test loading input stream
+        let mut grid = create_empty_grid();
+        let mut inputs = ArrayTrait::new();
+        inputs.append(10);
+        inputs.append(20);
+        inputs.append(30);
+        
+        load_inputs(ref grid, @inputs);
+        
+        assert_eq!(grid.in_stream.len(), 3, "Input stream should have 3 values");
+        assert_eq!(grid.in_cursor, 0, "Input cursor should start at 0");
+        assert_eq!(*grid.in_stream[0], 10, "First input should be 10");
+        assert_eq!(*grid.in_stream[1], 20, "Second input should be 20");
+        assert_eq!(*grid.in_stream[2], 30, "Third input should be 30");
+    }
+
+    #[test]
+    fn test_count_nodes_used_empty() {
+        // Test counting with no programs
+        let programs = ArrayTrait::new();
+        let count = count_nodes_used(@programs);
+        assert_eq!(count, 0, "Empty grid should have 0 nodes used");
+    }
+
+    #[test]
+    fn test_count_nodes_used_with_programs() {
+        // Test counting with some programs
+        let mut programs = ArrayTrait::new();
+        
+        // Row 0
+        let mut row0 = ArrayTrait::new();
+        let mut prog00 = ArrayTrait::new();
+        prog00.append(Inst { op: Op::Nop, src: Src::Nil, dst: Dst::Nil });
+        row0.append(prog00); // Program at (0,0)
+        row0.append(ArrayTrait::new()); // Empty at (0,1)
+        
+        // Row 1
+        let mut row1 = ArrayTrait::new();
+        row1.append(ArrayTrait::new()); // Empty at (1,0)
+        let mut prog11 = ArrayTrait::new();
+        prog11.append(Inst { op: Op::Hlt, src: Src::Nil, dst: Dst::Nil });
+        row1.append(prog11); // Program at (1,1)
+        
+        programs.append(row0);
+        programs.append(row1);
+        
+        let count = count_nodes_used(@programs);
+        assert_eq!(count, 2, "Should count 2 nodes with programs");
+    }
+
+    #[test]
+    fn test_execute_vm_simple() {
+        // Test basic VM execution
+        let mut grid = create_empty_grid();
+        
+        // Add a simple program that halts immediately
+        let mut prog = ArrayTrait::new();
+        prog.append(Inst { op: Op::Hlt, src: Src::Nil, dst: Dst::Nil });
+        
+        grid.progs = ArrayTrait::new();
+        let mut row0 = ArrayTrait::new();
+        row0.append(prog);
+        row0.append(ArrayTrait::new());
+        let mut row1 = ArrayTrait::new();
+        row1.append(ArrayTrait::new());
+        row1.append(ArrayTrait::new());
+        grid.progs.append(row0);
+        grid.progs.append(row1);
+        
+        let (final_grid, result) = execute_vm(grid, 100);
+        
+        match result {
+            StepResult::Halted => assert!(true, "VM should halt"),
+            _ => assert!(false, "Expected halted result"),
+        }
+        
+        assert!(final_grid.cycles > 0, "Should have executed some cycles");
+    }
+
+    #[test]
+    fn test_execute_vm_timeout() {
+        // Test VM timeout
+        let mut grid = create_empty_grid();
+        
+        // Add infinite loop program
+        let mut prog = ArrayTrait::new();
+        prog.append(Inst { op: Op::Jmp, src: Src::Lit(0), dst: Dst::Nil });
+        
+        grid.progs = ArrayTrait::new();
+        let mut row0 = ArrayTrait::new();
+        row0.append(prog);
+        row0.append(ArrayTrait::new());
+        let mut row1 = ArrayTrait::new();
+        row1.append(ArrayTrait::new());
+        row1.append(ArrayTrait::new());
+        grid.progs.append(row0);
+        grid.progs.append(row1);
+        
+        let (final_grid, _result) = execute_vm(grid, 5);
+        
+        assert_eq!(final_grid.cycles, 5, "Should execute exactly max_cycles");
+    }
+
+    #[test]
+    fn test_expand_seed() {
+        // Test seed expansion
+        let (grid, inputs, expected) = expand_seed(12345);
+        
+        // Check grid is initialized
+        assert_eq!(grid.cycles, 0, "Grid should start with 0 cycles");
+        
+        // Check inputs generated
+        assert_eq!(inputs.len(), 5, "Should generate 5 inputs");
+        assert_eq!(*inputs[0], 0, "First input should be 0");
+        assert_eq!(*inputs[1], 100, "Second input should be 100");
+        
+        // Check expected output
+        assert_eq!(expected.len(), 1, "Should have 1 expected output");
+        assert_eq!(*expected[0], 500, "Expected output should be 500");
+    }
+
+    #[test]
+    fn test_execute_zk100_integration() {
+        // Integration test for execute_zk100
+        let mut inputs = ArrayTrait::new();
+        inputs.append(1);
+        inputs.append(2);
+        
+        let mut expected = ArrayTrait::new();
+        expected.append(3);
+        
+        // Create a simple program that adds two inputs
+        let mut prog_words = ArrayTrait::new();
+        // This is simplified - in reality would need proper encoding
+        prog_words.append(0); // Program length marker
+        prog_words.append(0); // Instruction word
+        
+        let prog_merkle_root = commit_programs(@decode_programs(@prog_words));
+        
+        let result = execute_zk100(inputs, expected, prog_merkle_root, prog_words);
+        
+        // Check result is properly serialized
+        assert_eq!(result.len(), 7, "Result should have 7 elements");
+    }
+}

@@ -139,3 +139,176 @@ pub fn hash_single(value: felt252) -> felt252 {
     data.append(value);
     blake2s_to_felt(blake2s_hash(@data))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::array::ArrayTrait;
+
+    #[test]
+    fn test_blake2s_hash_empty() {
+        // Test hashing empty data
+        let empty_data = ArrayTrait::new();
+        let hash = blake2s_hash(@empty_data);
+        
+        // Check that we get a hash (8 u32 values)
+        // The exact values depend on blake2s finalization
+        assert!(hash.len() == 8, "Hash should have 8 u32 elements");
+    }
+
+    #[test]
+    fn test_blake2s_hash_single_value() {
+        // Test hashing single value
+        let mut data = ArrayTrait::new();
+        data.append(42);
+        let hash = blake2s_hash(@data);
+        
+        assert!(hash.len() == 8, "Hash should have 8 u32 elements");
+    }
+
+    #[test]
+    fn test_blake2s_to_felt() {
+        // Test conversion of blake2s output to felt252
+        let hash: [u32; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+        let felt_val = blake2s_to_felt(hash);
+        
+        // Should combine first 4 u32s
+        // Expected: 1 * 0x1000000000000 + 2 * 0x100000000 + 3 * 0x10000 + 4
+        let expected = 0x1000000000000 + 0x200000000 + 0x30000 + 4;
+        assert_eq!(felt_val, expected, "Conversion should match expected value");
+    }
+
+    #[test]
+    fn test_merkle_root_empty() {
+        // Test merkle root of empty array
+        let empty = ArrayTrait::new();
+        let root = merkle_root(@empty);
+        assert_eq!(root, 0, "Empty merkle root should be 0");
+    }
+
+    #[test]
+    fn test_merkle_root_single() {
+        // Test merkle root of single element
+        let mut leaves = ArrayTrait::new();
+        leaves.append(12345);
+        let root = merkle_root(@leaves);
+        assert_eq!(root, 12345, "Single element merkle root should be the element");
+    }
+
+    #[test]
+    fn test_merkle_root_two_elements() {
+        // Test merkle root of two elements
+        let mut leaves = ArrayTrait::new();
+        leaves.append(100);
+        leaves.append(200);
+        let root = merkle_root(@leaves);
+        
+        // Root should be hash of the pair
+        let expected = hash_pair(100, 200);
+        assert_eq!(root, expected, "Two element merkle root should be hash of pair");
+    }
+
+    #[test]
+    fn test_merkle_root_power_of_two() {
+        // Test with power of 2 elements
+        let mut leaves = ArrayTrait::new();
+        leaves.append(1);
+        leaves.append(2);
+        leaves.append(3);
+        leaves.append(4);
+        let root = merkle_root(@leaves);
+        
+        // Should build complete tree
+        assert!(root != 0, "Root should not be zero");
+    }
+
+    #[test]
+    fn test_merkle_root_non_power_of_two() {
+        // Test with non-power of 2 elements (should pad)
+        let mut leaves = ArrayTrait::new();
+        leaves.append(1);
+        leaves.append(2);
+        leaves.append(3);
+        let root = merkle_root(@leaves);
+        
+        // Should pad to 4 elements and build tree
+        assert!(root != 0, "Root should not be zero");
+    }
+
+    #[test]
+    fn test_merkle_proof_verify_valid() {
+        // Test valid merkle proof
+        let mut leaves = ArrayTrait::new();
+        leaves.append(10);
+        leaves.append(20);
+        leaves.append(30);
+        leaves.append(40);
+        
+        let root = merkle_root(@leaves);
+        
+        // Create proof for leaf at index 0 (value 10)
+        // Sibling at level 0: 20
+        // Sibling at level 1: hash_pair(30, 40)
+        let mut proof = ArrayTrait::new();
+        proof.append(20);
+        proof.append(hash_pair(30, 40));
+        
+        let valid = merkle_proof_verify(root, 10, @proof, 0);
+        assert!(valid, "Valid proof should verify");
+    }
+
+    #[test]
+    fn test_merkle_proof_verify_invalid_leaf() {
+        // Test invalid proof - wrong leaf value
+        let mut leaves = ArrayTrait::new();
+        leaves.append(10);
+        leaves.append(20);
+        
+        let root = merkle_root(@leaves);
+        
+        let mut proof = ArrayTrait::new();
+        proof.append(20); // Sibling
+        
+        // Try to verify with wrong leaf value
+        let valid = merkle_proof_verify(root, 99, @proof, 0);
+        assert!(!valid, "Invalid leaf should not verify");
+    }
+
+    #[test]
+    fn test_merkle_proof_verify_invalid_proof() {
+        // Test invalid proof - wrong sibling
+        let mut leaves = ArrayTrait::new();
+        leaves.append(10);
+        leaves.append(20);
+        
+        let root = merkle_root(@leaves);
+        
+        let mut proof = ArrayTrait::new();
+        proof.append(99); // Wrong sibling
+        
+        let valid = merkle_proof_verify(root, 10, @proof, 0);
+        assert!(!valid, "Invalid proof should not verify");
+    }
+
+    #[test]
+    fn test_hash_single() {
+        // Test single value hashing helper
+        let val1 = hash_single(42);
+        let val2 = hash_single(42);
+        assert_eq!(val1, val2, "Same input should produce same hash");
+        
+        let val3 = hash_single(43);
+        assert!(val1 != val3, "Different inputs should produce different hashes");
+    }
+
+    #[test]
+    fn test_hash_pair() {
+        // Test pair hashing
+        let hash1 = hash_pair(10, 20);
+        let hash2 = hash_pair(10, 20);
+        assert_eq!(hash1, hash2, "Same pair should produce same hash");
+        
+        let hash3 = hash_pair(20, 10);
+        assert!(hash1 != hash3, "Order should matter in pair hashing");
+    }
+}
