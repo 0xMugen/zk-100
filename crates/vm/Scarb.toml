@@ -4,8 +4,12 @@ version = "0.1.0"
 edition = "2024_07"
 
 [dependencies]
+cairo = "2.12.0"
 
 [lib]
 
 [cairo]
 enable-gas = false
+
+[dev-dependencies]
+assert_macros = "2.12.0"

@@ -330,3 +330,283 @@ fn write_destination(ref node: NodeState, dst: Dst, val: u32) -> Option<u32> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::inst::{Op, Src, Dst, PortTag};
+    use crate::state::{create_empty_grid, create_initial_node};
+    use core::array::ArrayTrait;
+
+    // Helper to create a simple test grid with a program
+    fn create_test_grid_with_program() -> GridState {
+        let mut grid = create_empty_grid();
+        
+        // Add a simple program to node (0,0)
+        let mut prog = ArrayTrait::new();
+        prog.append(Inst { op: Op::Nop, src: Src::Nil, dst: Dst::Nil });
+        prog.append(Inst { op: Op::Add, src: Src::Lit(5), dst: Dst::Nil });
+        prog.append(Inst { op: Op::Hlt, src: Src::Nil, dst: Dst::Nil });
+        
+        // Clear and rebuild programs array
+        grid.progs = ArrayTrait::new();
+        let mut row0 = ArrayTrait::new();
+        row0.append(prog);
+        row0.append(ArrayTrait::new()); // Empty program at (0,1)
+        let mut row1 = ArrayTrait::new();
+        row1.append(ArrayTrait::new()); // Empty program at (1,0)
+        row1.append(ArrayTrait::new()); // Empty program at (1,1)
+        grid.progs.append(row0);
+        grid.progs.append(row1);
+        
+        grid
+    }
+
+    #[test]
+    fn test_step_cycle_nop() {
+        // Test NOP instruction
+        let mut grid = create_test_grid_with_program();
+        
+        let result = step_cycle(ref grid);
+        assert_eq!(grid.cycles, 1, "Cycles should increment");
+        match result {
+            StepResult::Continue => assert!(true, "Should continue after NOP"),
+            _ => assert!(false, "Expected Continue result"),
+        }
+        
+        // Check that PC advanced
+        match get_node(@grid, 0, 0) {
+            Option::Some(node) => {
+                assert_eq!(node.pc, 1, "PC should advance after NOP");
+            },
+            Option::None => assert!(false, "Node should exist"),
+        }
+    }
+
+    #[test]
+    fn test_step_cycle_halt() {
+        // Test halt detection
+        let mut grid = create_empty_grid();
+        
+        // Create a program with just HLT
+        let mut prog = ArrayTrait::new();
+        prog.append(Inst { op: Op::Hlt, src: Src::Nil, dst: Dst::Nil });
+        
+        grid.progs = ArrayTrait::new();
+        let mut row0 = ArrayTrait::new();
+        row0.append(prog);
+        row0.append(ArrayTrait::new());
+        let mut row1 = ArrayTrait::new();
+        row1.append(ArrayTrait::new());
+        row1.append(ArrayTrait::new());
+        grid.progs.append(row0);
+        grid.progs.append(row1);
+        
+        // First step should halt node (0,0)
+        let _result = step_cycle(ref grid);
+        
+        // All other nodes have empty programs, so they should halt too
+        // This should result in all nodes halted
+        let result2 = step_cycle(ref grid);
+        match result2 {
+            StepResult::Halted => assert!(true, "Should detect all halted"),
+            _ => assert!(false, "Expected Halted result"),
+        }
+    }
+
+    #[test]
+    fn test_read_source() {
+        // Test reading from various sources
+        let grid = create_empty_grid();
+        let mut node = create_initial_node();
+        node.acc = 42;
+        
+        // Test Lit source
+        match read_source(@grid, @node, Src::Lit(100), 0, 0) {
+            Option::Some((val, consumed)) => {
+                assert_eq!(val, 100, "Should read literal value");
+                assert!(!consumed, "Literal should not consume input");
+            },
+            Option::None => assert!(false, "Literal read should succeed"),
+        }
+        
+        // Test Acc source
+        match read_source(@grid, @node, Src::Acc, 0, 0) {
+            Option::Some((val, consumed)) => {
+                assert_eq!(val, 42, "Should read accumulator value");
+                assert!(!consumed, "Acc should not consume input");
+            },
+            Option::None => assert!(false, "Acc read should succeed"),
+        }
+        
+        // Test Nil source
+        match read_source(@grid, @node, Src::Nil, 0, 0) {
+            Option::Some((val, consumed)) => {
+                assert_eq!(val, 0, "Nil should read as 0");
+                assert!(!consumed, "Nil should not consume input");
+            },
+            Option::None => assert!(false, "Nil read should succeed"),
+        }
+    }
+
+    #[test]
+    fn test_read_source_input() {
+        // Test input reading
+        let mut grid = create_empty_grid();
+        grid.in_stream = array![10, 20, 30];
+        grid.in_cursor = 0;
+        
+        let node = create_initial_node();
+        
+        // Test reading input at (0,0)
+        match read_source(@grid, @node, Src::In, 0, 0) {
+            Option::Some((val, consumed)) => {
+                assert_eq!(val, 10, "Should read first input value");
+                assert!(consumed, "Input should be consumed");
+            },
+            Option::None => assert!(false, "Input read should succeed at (0,0)"),
+        }
+        
+        // Test reading input at wrong position
+        match read_source(@grid, @node, Src::In, 1, 1) {
+            Option::None => assert!(true, "Input read should fail at (1,1)"),
+            Option::Some(_) => assert!(false, "Input read should fail at wrong position"),
+        }
+    }
+
+    #[test]
+    fn test_write_destination() {
+        // Test writing to various destinations
+        let mut node = create_initial_node();
+        
+        // Test Acc destination
+        let result = write_destination(ref node, Dst::Acc, 123);
+        match result {
+            Option::None => assert!(true, "Acc write should return None"),
+            Option::Some(_) => assert!(false, "Acc write should not return value"),
+        }
+        assert_eq!(node.acc, 123, "Acc should be updated");
+        assert!(!node.flags.z, "Zero flag should be false");
+        
+        // Test Nil destination
+        node.acc = 999; // Set to something else
+        let result2 = write_destination(ref node, Dst::Nil, 456);
+        match result2 {
+            Option::None => assert!(true, "Nil write should return None"),
+            Option::Some(_) => assert!(false, "Nil write should not return value"),
+        }
+        assert_eq!(node.acc, 999, "Acc should not change for Nil write");
+        
+        // Test Out destination
+        let result3 = write_destination(ref node, Dst::Out, 789);
+        match result3 {
+            Option::Some(val) => assert_eq!(val, 789, "Out should return the value"),
+            Option::None => assert!(false, "Out write should return value"),
+        }
+    }
+
+    #[test]
+    fn test_execute_add_instruction() {
+        // Test ADD instruction execution
+        let mut grid = create_empty_grid();
+        let mut node = create_initial_node();
+        node.acc = 10;
+        
+        let add_inst = Inst {
+            op: Op::Add,
+            src: Src::Lit(15),
+            dst: Dst::Nil,
+        };
+        
+        match execute_instruction(@grid, @node, add_inst, 0, 0) {
+            Option::Some(result) => {
+                assert_eq!(result.new_node.acc, 25, "Add should sum values");
+                assert_eq!(result.new_node.pc, 1, "PC should advance");
+                assert!(!result.blocked, "Should not be blocked");
+                assert!(!result.new_node.flags.z, "Zero flag should be false");
+            },
+            Option::None => assert!(false, "Add execution should succeed"),
+        }
+    }
+
+    #[test]
+    fn test_execute_sub_instruction() {
+        // Test SUB instruction
+        let mut grid = create_empty_grid();
+        let mut node = create_initial_node();
+        node.acc = 20;
+        
+        let sub_inst = Inst {
+            op: Op::Sub,
+            src: Src::Lit(20),
+            dst: Dst::Nil,
+        };
+        
+        match execute_instruction(@grid, @node, sub_inst, 0, 0) {
+            Option::Some(result) => {
+                assert_eq!(result.new_node.acc, 0, "Sub should subtract values");
+                assert!(result.new_node.flags.z, "Zero flag should be true for 0");
+                assert!(!result.new_node.flags.n, "Negative flag should be false for 0");
+            },
+            Option::None => assert!(false, "Sub execution should succeed"),
+        }
+    }
+
+    #[test]
+    fn test_execute_mov_instruction() {
+        // Test MOV instruction
+        let mut grid = create_empty_grid();
+        let node = create_initial_node();
+        
+        let mov_inst = Inst {
+            op: Op::Mov,
+            src: Src::Lit(42),
+            dst: Dst::Acc,
+        };
+        
+        match execute_instruction(@grid, @node, mov_inst, 0, 0) {
+            Option::Some(result) => {
+                assert_eq!(result.new_node.acc, 42, "Mov should set accumulator");
+                assert_eq!(result.new_node.pc, 1, "PC should advance");
+                assert!(!result.blocked, "Should not be blocked");
+            },
+            Option::None => assert!(false, "Mov execution should succeed"),
+        }
+    }
+
+    #[test]
+    fn test_execute_conditional_jumps() {
+        // Test conditional jump instructions
+        let grid = create_empty_grid();
+        
+        // Test JZ with zero flag set
+        let mut node_zero = create_initial_node();
+        node_zero.acc = 0;
+        node_zero.flags = make_flags(0);
+        
+        let jz_inst = Inst {
+            op: Op::Jz,
+            src: Src::Lit(10),
+            dst: Dst::Nil,
+        };
+        
+        match execute_instruction(@grid, @node_zero, jz_inst, 0, 0) {
+            Option::Some(result) => {
+                assert_eq!(result.new_node.pc, 10, "JZ should jump when zero flag set");
+            },
+            Option::None => assert!(false, "JZ execution should succeed"),
+        }
+        
+        // Test JZ with zero flag not set
+        let mut node_nonzero = create_initial_node();
+        node_nonzero.acc = 5;
+        node_nonzero.flags = make_flags(5);
+        
+        match execute_instruction(@grid, @node_nonzero, jz_inst, 0, 0) {
+            Option::Some(result) => {
+                assert_eq!(result.new_node.pc, 1, "JZ should not jump when zero flag not set");
+            },
+            Option::None => assert!(false, "JZ execution should succeed"),
+        }
+    }
+}

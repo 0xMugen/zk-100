@@ -147,3 +147,176 @@ pub fn get_program(grid: @GridState, r: u32, c: u32) -> Option<@Array<Inst>> {
         Option::None => Option::None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::inst::{Op, Src, Dst};
+
+    #[test]
+    fn test_port_enum() {
+        // Test Port enum creation
+        let _up = Port::Up;
+        let _down = Port::Down;
+        let _left = Port::Left;
+        let _right = Port::Right;
+        assert!(true, "All Port variants created");
+    }
+
+    #[test]
+    fn test_flags_creation() {
+        // Test flag creation
+        let flags_zero = Flags { z: true, n: false };
+        let flags_neg = Flags { z: false, n: true };
+        let flags_pos = Flags { z: false, n: false };
+        
+        assert!(flags_zero.z, "Zero flag set correctly");
+        assert!(!flags_zero.n, "Negative flag not set for zero");
+        assert!(!flags_neg.z, "Zero flag not set for negative");
+        assert!(flags_neg.n, "Negative flag set correctly");
+    }
+
+    #[test]
+    fn test_make_flags() {
+        // Test make_flags helper function
+        // Test zero
+        let flags_zero = make_flags(0);
+        assert!(flags_zero.z, "Zero flag should be true for 0");
+        assert!(!flags_zero.n, "Negative flag should be false for 0");
+        
+        // Test positive number
+        let flags_pos = make_flags(42);
+        assert!(!flags_pos.z, "Zero flag should be false for 42");
+        assert!(!flags_pos.n, "Negative flag should be false for 42");
+        
+        // Test negative number (high bit set)
+        let flags_neg = make_flags(0x80000001); // MSB set
+        assert!(!flags_neg.z, "Zero flag should be false");
+        assert!(flags_neg.n, "Negative flag should be true when MSB set");
+    }
+
+    #[test]
+    fn test_node_state_creation() {
+        // Test creating initial node state
+        let node = create_initial_node();
+        assert_eq!(node.acc, 0, "Initial accumulator should be 0");
+        assert_eq!(node.bak, 0, "Initial backup should be 0");
+        assert_eq!(node.pc, 0, "Initial PC should be 0");
+        assert!(node.flags.z, "Initial zero flag should be true");
+        assert!(!node.flags.n, "Initial negative flag should be false");
+        assert!(!node.halted, "Initial halted should be false");
+        assert!(!node.blocked, "Initial blocked should be false");
+        
+        // Test last port is None
+        match node.last {
+            Option::None => assert!(true, "Initial last port should be None"),
+            Option::Some(_) => assert!(false, "Initial last port should be None"),
+        }
+    }
+
+    #[test]
+    fn test_score_struct() {
+        // Test Score struct
+        let score = Score {
+            cycles: 100,
+            msgs: 5,
+            nodes_used: 3,
+        };
+        assert_eq!(score.cycles, 100, "Cycles set correctly");
+        assert_eq!(score.msgs, 5, "Messages set correctly");
+        assert_eq!(score.nodes_used, 3, "Nodes used set correctly");
+    }
+
+    #[test]
+    fn test_within_grid() {
+        // Test grid boundary checking
+        assert!(within_grid(0, 0), "0,0 should be within grid");
+        assert!(within_grid(0, 1), "0,1 should be within grid");
+        assert!(within_grid(1, 0), "1,0 should be within grid");
+        assert!(within_grid(1, 1), "1,1 should be within grid");
+        
+        assert!(!within_grid(2, 0), "2,0 should be outside grid");
+        assert!(!within_grid(0, 2), "0,2 should be outside grid");
+        assert!(!within_grid(2, 2), "2,2 should be outside grid");
+        assert!(!within_grid(100, 100), "100,100 should be outside grid");
+    }
+
+    #[test]
+    fn test_create_empty_grid() {
+        // Test empty grid creation
+        let grid = create_empty_grid();
+        
+        assert_eq!(grid.cycles, 0, "Initial cycles should be 0");
+        assert_eq!(grid.msgs, 0, "Initial messages should be 0");
+        assert_eq!(grid.in_cursor, 0, "Initial input cursor should be 0");
+        assert_eq!(grid.in_stream.len(), 0, "Initial input stream should be empty");
+        assert_eq!(grid.out_stream.len(), 0, "Initial output stream should be empty");
+        assert_eq!(grid.nodes.len(), GRID_H, "Grid should have correct height");
+        assert_eq!(grid.progs.len(), GRID_H, "Programs should have correct height");
+        
+        // Check each row
+        let mut r = 0;
+        while r < GRID_H {
+            match grid.nodes.get(r) {
+                Option::Some(row) => {
+                    assert_eq!(row.unbox().len(), GRID_W, "Node row should have correct width");
+                },
+                Option::None => assert!(false, "Node row should exist"),
+            }
+            match grid.progs.get(r) {
+                Option::Some(row) => {
+                    assert_eq!(row.unbox().len(), GRID_W, "Program row should have correct width");
+                },
+                Option::None => assert!(false, "Program row should exist"),
+            }
+            r += 1;
+        }
+    }
+
+    #[test]
+    fn test_get_node() {
+        // Test node access
+        let grid = create_empty_grid();
+        
+        // Test valid positions
+        match get_node(@grid, 0, 0) {
+            Option::Some(node) => {
+                assert_eq!(node.acc, 0, "Node at 0,0 should have acc=0");
+            },
+            Option::None => assert!(false, "Node at 0,0 should exist"),
+        }
+        
+        match get_node(@grid, 1, 1) {
+            Option::Some(node) => {
+                assert_eq!(node.pc, 0, "Node at 1,1 should have pc=0");
+            },
+            Option::None => assert!(false, "Node at 1,1 should exist"),
+        }
+        
+        // Test invalid positions
+        match get_node(@grid, 2, 0) {
+            Option::None => assert!(true, "Node at 2,0 should not exist"),
+            Option::Some(_) => assert!(false, "Node at 2,0 should not exist"),
+        }
+    }
+
+    #[test]
+    fn test_get_program() {
+        // Test program access
+        let grid = create_empty_grid();
+        
+        // Test valid positions (should have empty programs)
+        match get_program(@grid, 0, 0) {
+            Option::Some(prog) => {
+                assert_eq!(prog.len(), 0, "Initial program at 0,0 should be empty");
+            },
+            Option::None => assert!(false, "Program at 0,0 should exist"),
+        }
+        
+        // Test invalid positions
+        match get_program(@grid, 3, 3) {
+            Option::None => assert!(true, "Program at 3,3 should not exist"),
+            Option::Some(_) => assert!(false, "Program at 3,3 should not exist"),
+        }
+    }
+}
