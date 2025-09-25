@@ -334,7 +334,7 @@ fn write_destination(ref node: NodeState, dst: Dst, val: u32) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::inst::{Op, Src, Dst, PortTag};
+    use crate::inst::{Op, Src, Dst};
     use crate::state::{create_empty_grid, create_initial_node};
     use core::array::ArrayTrait;
 
@@ -377,7 +377,7 @@ mod tests {
         // Check that PC advanced
         match get_node(@grid, 0, 0) {
             Option::Some(node) => {
-                assert_eq!(node.pc, 1, "PC should advance after NOP");
+                assert_eq!(*node.pc, 1, "PC should advance after NOP");
             },
             Option::None => assert!(false, "Node should exist"),
         }

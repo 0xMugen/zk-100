@@ -1,7 +1,7 @@
 use core::array::ArrayTrait;
 use core::option::Option;
 use core::traits::Into;
-use zk100_vm::{Score, Inst, Op, Src, Dst};
+use zk100_vm::{Score, Inst, Op, Src, Dst, PortTag};
 use super::hash::merkle_root;
 
 // Public outputs structure containing all commitments and results

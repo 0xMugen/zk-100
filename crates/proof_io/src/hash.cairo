@@ -25,7 +25,7 @@ pub fn blake2s_hash(data: @Array<felt252>) -> [u32; 8] {
 // Convert blake2s output to felt252
 pub fn blake2s_to_felt(hash: [u32; 8]) -> felt252 {
     // For fixed-size arrays, we need to destructure
-    let [h0, h1, h2, h3, h4, h5, h6, h7] = hash;
+    let [h0, h1, h2, h3, _h4, _h5, _h6, _h7] = hash;
     
     // Combine first 4 u32s into a felt252 (simplified)
     let f0: felt252 = h0.into();
@@ -149,11 +149,11 @@ mod tests {
     fn test_blake2s_hash_empty() {
         // Test hashing empty data
         let empty_data = ArrayTrait::new();
-        let hash = blake2s_hash(@empty_data);
+        let _hash = blake2s_hash(@empty_data);
         
         // Check that we get a hash (8 u32 values)
         // The exact values depend on blake2s finalization
-        assert!(hash.len() == 8, "Hash should have 8 u32 elements");
+        // Type system guarantees hash is [u32; 8]
     }
 
     #[test]
@@ -161,9 +161,9 @@ mod tests {
         // Test hashing single value
         let mut data = ArrayTrait::new();
         data.append(42);
-        let hash = blake2s_hash(@data);
+        let _hash = blake2s_hash(@data);
         
-        assert!(hash.len() == 8, "Hash should have 8 u32 elements");
+        // Type system guarantees hash is [u32; 8]
     }
 
     #[test]

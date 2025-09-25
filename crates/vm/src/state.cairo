@@ -151,7 +151,6 @@ pub fn get_program(grid: @GridState, r: u32, c: u32) -> Option<@Array<Inst>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::inst::{Op, Src, Dst};
 
     #[test]
     fn test_port_enum() {
@@ -168,7 +167,7 @@ mod tests {
         // Test flag creation
         let flags_zero = Flags { z: true, n: false };
         let flags_neg = Flags { z: false, n: true };
-        let flags_pos = Flags { z: false, n: false };
+        let _flags_pos = Flags { z: false, n: false };
         
         assert!(flags_zero.z, "Zero flag set correctly");
         assert!(!flags_zero.n, "Negative flag not set for zero");
@@ -281,14 +280,14 @@ mod tests {
         // Test valid positions
         match get_node(@grid, 0, 0) {
             Option::Some(node) => {
-                assert_eq!(node.acc, 0, "Node at 0,0 should have acc=0");
+                assert_eq!(*node.acc, 0, "Node at 0,0 should have acc=0");
             },
             Option::None => assert!(false, "Node at 0,0 should exist"),
         }
         
         match get_node(@grid, 1, 1) {
             Option::Some(node) => {
-                assert_eq!(node.pc, 0, "Node at 1,1 should have pc=0");
+                assert_eq!(*node.pc, 0, "Node at 1,1 should have pc=0");
             },
             Option::None => assert!(false, "Node at 1,1 should exist"),
         }

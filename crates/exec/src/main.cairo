@@ -8,7 +8,7 @@ fn main(inputs: Array<u32>, expected: Array<u32>, prog_merkle_root: felt252, pro
 
 use zk100_vm::{
     GridState, StepResult, Inst, Op, Src, Dst, Score,
-    create_empty_grid, step_cycle, check_target,
+    create_empty_grid, step_cycle, check_target, get_program,
     GRID_H, GRID_W
 };
 
