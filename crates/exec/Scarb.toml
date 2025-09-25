@@ -6,8 +6,12 @@ edition = "2024_07"
 [dependencies]
 zk100_vm = { path = "../vm" }
 zk100_proof_io = { path = "../proof_io" }
+cairo_execute = "2.12.0"
 
 [lib]
+
+[executable]
+
 
 [cairo]
 enable-gas = false

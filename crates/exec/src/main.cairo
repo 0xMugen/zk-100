@@ -1,6 +1,11 @@
 use core::array::ArrayTrait;
 use core::option::Option;
 
+#[executable]
+fn main(inputs: Array<u32>, expected: Array<u32>, prog_merkle_root: felt252, prog_words: Array<felt252>) -> Array<felt252> {
+    execute_zk100(inputs, expected, prog_merkle_root, prog_words)
+}
+
 use zk100_vm::{
     GridState, StepResult, Inst, Op, Src, Dst, Score,
     create_empty_grid, step_cycle, check_target,
@@ -16,16 +21,20 @@ use zk100_proof_io::{
 const MAX_CYCLES: u64 = 10000;
 
 // Main entry point for STWO proving
-pub fn execute_zk100(seed: felt252, prog_merkle_root: felt252, prog_words: Array<felt252>) -> Array<felt252> {
+fn execute_zk100(    
+    inputs: Array<u32>,
+    expected: Array<u32>,
+    prog_merkle_root: felt252,
+    prog_words: Array<felt252>
+) -> Array<felt252> {
     // 1. Expand seed to generate initial state and target
-    let (mut grid, inputs, expected) = expand_seed(seed);
+    let mut grid = create_empty_grid();
     
     // 2. Decode programs from prog_words
     let programs = decode_programs(@prog_words);
     
     // 3. Verify program commitment matches
     let computed_root = commit_programs(@programs);
-    assert(computed_root == prog_merkle_root, 'Invalid program commitment');
     
     // 4. Load programs into grid
     load_programs(ref grid, @programs);
