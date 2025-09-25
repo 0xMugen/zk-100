@@ -35,6 +35,7 @@ fn execute_zk100(
     
     // 3. Verify program commitment matches
     let computed_root = commit_programs(@programs);
+    assert(computed_root == prog_merkle_root, 'Invalid program commitment');
     
     // 4. Load programs into grid
     load_programs(ref grid, @programs);
