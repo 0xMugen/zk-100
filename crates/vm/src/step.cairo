@@ -1,6 +1,7 @@
 use core::bool::{True, False};
 use core::option::Option;
 use core::array::ArrayTrait;
+use core::num::traits::WrappingSub;
 
 use super::inst::{Inst, Op, Src, Dst, PortTag};
 use super::state::{
@@ -217,7 +218,7 @@ fn execute_instruction_with_ports(grid: @GridState, node: @NodeState, inst: Inst
             }
         },
         Op::Neg => {
-            new_node.acc = 0_u32 - new_node.acc;  // Two's complement negation
+            new_node.acc = 0_u32.wrapping_sub(new_node.acc);
             new_node.flags = make_flags(new_node.acc);
             new_node.pc += 1;
         },
