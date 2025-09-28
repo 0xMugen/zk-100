@@ -1,0 +1,16 @@
+[package]
+name = "zk100_merkle_calc"
+version = "0.1.0"
+edition = "2024_07"
+
+[cairo]
+enable-gas = false
+
+[dependencies]
+zk100_vm = { path = "../vm" }
+zk100_proof_io = { path = "../proof_io" }
+cairo_execute = "2.12.0"
+
+[[target.executable]]
+name = "merkle_calc"
+function = "zk100_merkle_calc::main::main"

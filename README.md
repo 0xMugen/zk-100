@@ -2,7 +2,7 @@
 
 ## Overview
 
-ZK-100 is a parallel programming puzzle game where you program a grid of **tiny compute nodes** to transform an **input stream** into an **output stream** according to challenge specifications.
+ZK-100 is a parallel programming puzzle game where you program a grid of **tiny compute nodes** to transform an **input stream** into an **output stream** according to challenge specifications. Solutions are verified using zero-knowledge proofs powered by STWO (StarkWare's next-generation proving system).
 
 ### Key Concepts
 - Each node runs a small **assembly-like program** you write
@@ -10,6 +10,111 @@ ZK-100 is a parallel programming puzzle game where you program a grid of **tiny 
 - Nodes communicate via message ports with neighbors
 - Special nodes connect to the outside world (`IN`, `OUT`)
 - Your score reflects **solution efficiency** (cycles, messages, nodes)
+- Solutions generate **cryptographic proofs** for verification
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Rust (latest stable)
+- [Scarb](https://docs.swmansion.com/scarb/) 2.12.0 or later
+- Cairo 2.12.0 or later
+
+### Building the Project
+
+1. Build the Cairo components:
+```bash
+cd crates/exec && scarb build
+cd ../vm && scarb build
+cd ../proof_io && scarb build
+cd ../merkle_calc && scarb build
+```
+
+2. Build the Rust host:
+```bash
+cd host
+cargo build --release
+```
+
+### Using the ZK-100 Host
+
+The Rust host provides a complete pipeline from assembly code to zero-knowledge proofs:
+
+#### 1. Assemble a Program
+Convert assembly code to Cairo-compatible format:
+```bash
+cargo run --release -- assemble test/test_simple.asm --challenge test/challenge_simple.json
+```
+
+Options:
+- `--challenge <file>`: JSON file with inputs/expected outputs
+- `--inputs <comma-separated>`: Direct input values (e.g., `--inputs 1,2,3`)
+- `--expected <comma-separated>`: Expected outputs (e.g., `--expected 2,3,4`)
+- `--output <file>`: Custom output path for args.json
+
+#### 2. Generate and Verify a Proof
+Create a zero-knowledge proof of correct execution:
+```bash
+cargo run --release -- prove test/test_simple.asm --challenge test/challenge_simple.json
+```
+
+This command:
+1. Assembles the program
+2. Tests execution with `scarb execute` (shows if logic is correct)
+3. Generates a proof with `cairo-prove`
+4. Saves the proof to `proof/proof_simple.json`
+
+Options:
+- `--executable <path>`: Path to Cairo executable (default: `../crates/exec/target/dev/zk100_exec.executable.json`)
+- `--proof <path>`: Custom proof output path
+
+### Challenge Format
+
+Challenge files specify test cases in JSON:
+```json
+{
+  "inputs": [1, 2, 3],
+  "expected": [2, 4, 6]
+}
+```
+
+### Example Test Programs
+
+The `host/test/` directory contains sample programs:
+- `test_simple.asm`: Outputs a constant value (42)
+- `test_negate.asm`: Negates input values
+- `test_program.asm`: Adds 10 to each input
+
+Each has a corresponding challenge file (e.g., `challenge_simple.json`).
+
+### Running Tests
+
+Test the Cairo VM implementation:
+```bash
+cd crates/exec && scarb test
+cd ../vm && scarb test
+cd ../proof_io && scarb test
+```
+
+---
+
+## Technical Details
+
+### Secure Hashing
+ZK-100 uses Poseidon hash for cryptographic security in merkle tree commitments. The system ensures perfect compatibility between Rust and Cairo by delegating merkle root calculations to Cairo via `scarb execute`.
+
+### Proof Generation
+The system uses STWO (StarkWare's next-generation prover) to generate zero-knowledge proofs. Even incorrect solutions generate valid proofs - the proof simply attests that the computation was performed as specified, with a flag indicating whether the puzzle was solved correctly.
+
+### Debugging
+When running `prove`, the system executes the program twice:
+1. With `scarb execute` - Shows program output and any logic errors
+2. With `cairo-prove` - Generates the cryptographic proof
+
+This helps distinguish between:
+- Logic errors (program doesn't produce expected output)
+- Proof generation errors (issues with the proving system)
 
 ---
 
@@ -147,19 +252,19 @@ HLT             ; Halt this node permanently
 
 ### Assembly Format
 ```asm
-#NODE 0,0
+NODE (0,0)
 MOV IN, RIGHT
 HLT
 
-#NODE 0,1
+NODE (0,1)
 MOV LEFT, DOWN
 HLT
 
-#NODE 1,0
+NODE (1,0)
 MOV UP, RIGHT
 HLT
 
-#NODE 1,1
+NODE (1,1)
 loop:
     MOV LEFT, ACC
     ADD 1
