@@ -3,12 +3,10 @@ mod public;
 
 // Export hash functions
 pub use hash::{
-    blake2s_hash, 
-    blake2s_to_felt,
     merkle_root, 
     merkle_proof_verify,
     hash_single,
-    BLAKE2S_256_INITIAL_STATE
+    hash_pair
 };
 
 // Export public interface

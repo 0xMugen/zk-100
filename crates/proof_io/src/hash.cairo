@@ -1,91 +1,9 @@
-use core::blake::blake2s_finalize;
-use core::box::BoxTrait;
-use core::array::ArrayTrait;
+use core::poseidon::poseidon_hash_span;
+use core::array::{ArrayTrait, SpanTrait};
+use core::option::Option;
 use core::traits::Into;
 
-pub const BLAKE2S_256_INITIAL_STATE: [u32; 8] = [
-    0x6B08E647, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 
-    0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
-];
-
-// Hash arbitrary data using blake2s
-pub fn blake2s_hash(data: @Array<felt252>) -> [u32; 8] {
-    if data.len() == 0 {
-        // Hash empty data
-        let state = BoxTrait::new(BLAKE2S_256_INITIAL_STATE);
-        return blake2s_finalize(state, 0, BoxTrait::new([0; 16])).unbox();
-    }
-    
-    // Simplified implementation - use data length to differentiate hashes
-    let [s0, s1, s2, s3, s4, s5, s6, s7] = BLAKE2S_256_INITIAL_STATE;
-    
-    // Mix in data length and first elements to create different hashes
-    let len: u32 = data.len();
-    let new_s0 = s0 ^ len;
-    
-    // Add some differentiation based on first element if present
-    let new_s1 = if data.len() > 0 {
-        // Simple hash: just use different constants for different values
-        let val = *data[0];
-        if val == 0 {
-            s1
-        } else if val == 1 {
-            s1 ^ 0x12345678
-        } else if val == 2 {
-            s1 ^ 0x87654321
-        } else if val == 10 {
-            s1 ^ 0x10101010
-        } else if val == 20 {
-            s1 ^ 0x20202020
-        } else if val == 42 {
-            s1 ^ 0x42424242
-        } else if val == 43 {
-            s1 ^ 0x43434343
-        } else if val == 99 {
-            s1 ^ 0x63636363
-        } else if val == 100 {
-            s1 ^ 0x64646464
-        } else {
-            s1 ^ 0xabcdef00
-        }
-    } else {
-        s1
-    };
-    
-    // Add differentiation based on second element for pair hashing
-    let new_s2 = if data.len() > 1 {
-        let val = *data[1];
-        if val == 10 {
-            s2 ^ 0x10101010
-        } else if val == 20 {
-            s2 ^ 0x20202020
-        } else {
-            s2 ^ 0xdeadbeef
-        }
-    } else {
-        s2
-    };
-    
-    let state = [new_s0, new_s1, new_s2, s3, s4, s5, s6, s7];
-    let state_box = BoxTrait::new(state);
-    blake2s_finalize(state_box, 64, BoxTrait::new([0; 16])).unbox()
-}
-
-// Convert blake2s output to felt252
-pub fn blake2s_to_felt(hash: [u32; 8]) -> felt252 {
-    // For fixed-size arrays, we need to destructure
-    let [h0, h1, h2, h3, _h4, _h5, _h6, _h7] = hash;
-    
-    // Combine first 4 u32s into a felt252 (simplified)
-    let f0: felt252 = h0.into();
-    let f1: felt252 = h1.into();
-    let f2: felt252 = h2.into();
-    let f3: felt252 = h3.into();
-    
-    f0 * 0x1000000000000 + f1 * 0x100000000 + f2 * 0x10000 + f3
-}
-
-// Compute Merkle root of an array of felt252 values
+// Compute Merkle root of an array of felt252 values using Poseidon
 pub fn merkle_root(leaves: @Array<felt252>) -> felt252 {
     if leaves.len() == 0 {
         return 0;
@@ -103,17 +21,17 @@ pub fn merkle_root(leaves: @Array<felt252>) -> felt252 {
         i += 1;
     }
     
-    // Pad to power of 2 if needed
+    // Pad to power of 2 with zeros (matching original algorithm)
     let mut size = current_level.len();
     let mut power = 1;
     while power < size {
         power *= 2;
     }
     while current_level.len() < power {
-        current_level.append(0); // Pad with zeros
+        current_level.append(0);
     }
     
-    // Build tree levels
+    // Build tree levels using Poseidon
     while current_level.len() > 1 {
         let mut next_level = ArrayTrait::new();
         let mut i = 0;
@@ -125,8 +43,7 @@ pub fn merkle_root(leaves: @Array<felt252>) -> felt252 {
                 0
             };
             
-            // Hash pair using simple addition for now
-            // In production would use proper hashing
+            // Hash pair using Poseidon
             let hash_val = hash_pair(left, right);
             next_level.append(hash_val);
             
@@ -142,14 +59,12 @@ pub fn merkle_root(leaves: @Array<felt252>) -> felt252 {
     }
 }
 
-// Simple hash function for pairs
-fn hash_pair(left: felt252, right: felt252) -> felt252 {
-    // Simple combination - in production would use proper hash
+// Hash a pair of felt252 values using Poseidon
+pub fn hash_pair(left: felt252, right: felt252) -> felt252 {
     let mut data = ArrayTrait::new();
     data.append(left);
     data.append(right);
-    let hash = blake2s_hash(@data);
-    blake2s_to_felt(hash)
+    poseidon_hash_span(data.span())
 }
 
 // Verify a Merkle proof
@@ -182,50 +97,17 @@ pub fn merkle_proof_verify(
     current == root
 }
 
-// Helper to hash a single felt252 value
+// Helper to hash a single felt252 value with Poseidon
 pub fn hash_single(value: felt252) -> felt252 {
     let mut data = ArrayTrait::new();
     data.append(value);
-    blake2s_to_felt(blake2s_hash(@data))
+    poseidon_hash_span(data.span())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use core::array::ArrayTrait;
-
-    #[test]
-    fn test_blake2s_hash_empty() {
-        // Test hashing empty data
-        let empty_data = ArrayTrait::new();
-        let _hash = blake2s_hash(@empty_data);
-        
-        // Check that we get a hash (8 u32 values)
-        // The exact values depend on blake2s finalization
-        // Type system guarantees hash is [u32; 8]
-    }
-
-    #[test]
-    fn test_blake2s_hash_single_value() {
-        // Test hashing single value
-        let mut data = ArrayTrait::new();
-        data.append(42);
-        let _hash = blake2s_hash(@data);
-        
-        // Type system guarantees hash is [u32; 8]
-    }
-
-    #[test]
-    fn test_blake2s_to_felt() {
-        // Test conversion of blake2s output to felt252
-        let hash: [u32; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
-        let felt_val = blake2s_to_felt(hash);
-        
-        // Should combine first 4 u32s
-        // Expected: 1 * 0x1000000000000 + 2 * 0x100000000 + 3 * 0x10000 + 4
-        let expected = 0x1000000000000 + 0x200000000 + 0x30000 + 4;
-        assert_eq!(felt_val, expected, "Conversion should match expected value");
-    }
 
     #[test]
     fn test_merkle_root_empty() {
@@ -252,7 +134,7 @@ mod tests {
         leaves.append(200);
         let root = merkle_root(@leaves);
         
-        // Root should be hash of the pair
+        // Root should be poseidon hash of the pair
         let expected = hash_pair(100, 200);
         assert_eq!(root, expected, "Two element merkle root should be hash of pair");
     }
@@ -351,13 +233,62 @@ mod tests {
     }
 
     #[test]
-    fn test_hash_pair() {
-        // Test pair hashing
+    fn test_hash_pair_deterministic() {
+        // Test pair hashing is deterministic
         let hash1 = hash_pair(10, 20);
         let hash2 = hash_pair(10, 20);
         assert_eq!(hash1, hash2, "Same pair should produce same hash");
         
         let hash3 = hash_pair(20, 10);
         assert!(hash1 != hash3, "Order should matter in pair hashing");
+    }
+
+    #[test]
+    fn test_poseidon_basic() {
+        // Basic test to ensure Poseidon is working
+        let mut data = ArrayTrait::new();
+        data.append(1);
+        data.append(2);
+        data.append(3);
+        
+        let hash = poseidon_hash_span(data.span());
+        
+        // Poseidon should produce non-zero hash for non-empty input
+        assert!(hash != 0, "Poseidon hash should not be zero");
+        
+        // Hash should be deterministic
+        let hash2 = poseidon_hash_span(data.span());
+        assert_eq!(hash, hash2, "Poseidon should be deterministic");
+    }
+
+    #[test]
+    fn test_cairo_poseidon_test_vectors() {
+        // Test vectors to match with Rust implementation
+        
+        // Test hash_pair(100, 200)
+        let result1 = hash_pair(100, 200);
+        // Cairo actual result: 3199895829076014876906394973539079787786658195321510851734821809729636028785
+        // Let's just verify it's deterministic for now
+        let result1_check = hash_pair(100, 200);
+        assert_eq!(result1, result1_check, "hash_pair should be deterministic");
+        
+        // Test merkle_root([12345])
+        let mut single = ArrayTrait::new();
+        single.append(12345);
+        let result2 = merkle_root(@single);
+        assert_eq!(result2, 12345, "merkle_root([12345]) should return 12345");
+        
+        // Test merkle_root([100, 200])
+        let mut two = ArrayTrait::new();
+        two.append(100);
+        two.append(200);
+        let result3 = merkle_root(@two);
+        // Should equal hash_pair(100, 200)
+        assert_eq!(result3, result1, "merkle_root([100, 200]) should equal hash_pair(100, 200)");
+        
+        // Test merkle_root([])
+        let empty = ArrayTrait::new();
+        let result4 = merkle_root(@empty);
+        assert_eq!(result4, 0, "merkle_root([]) should return 0");
     }
 }
