@@ -10,21 +10,21 @@ interface NodeGridProps {
 export const NodeGrid: React.FC<NodeGridProps> = ({ nodes, onCodeChange }) => {
   const getConnectionStyle = (from: string, to: string) => {
     const connections: Record<string, string> = {
-      '0,0-1,0': 'absolute top-1/2 -right-px w-8 h-px bg-zk-accent',
-      '1,0-0,0': 'absolute top-1/2 -left-px w-8 h-px bg-zk-accent',
-      '0,0-0,1': 'absolute -bottom-px left-1/2 w-px h-8 bg-zk-accent',
-      '0,1-0,0': 'absolute -top-px left-1/2 w-px h-8 bg-zk-accent',
-      '1,0-1,1': 'absolute -bottom-px left-1/2 w-px h-8 bg-zk-accent',
-      '1,1-1,0': 'absolute -top-px left-1/2 w-px h-8 bg-zk-accent',
-      '0,1-1,1': 'absolute top-1/2 -right-px w-8 h-px bg-zk-accent',
-      '1,1-0,1': 'absolute top-1/2 -left-px w-8 h-px bg-zk-accent',
+      '0,0-1,0': 'absolute top-1/2 -right-px w-6 h-px bg-zk-accent',
+      '1,0-0,0': 'absolute top-1/2 -left-px w-6 h-px bg-zk-accent',
+      '0,0-0,1': 'absolute -bottom-px left-1/2 w-px h-6 bg-zk-accent',
+      '0,1-0,0': 'absolute -top-px left-1/2 w-px h-6 bg-zk-accent',
+      '1,0-1,1': 'absolute -bottom-px left-1/2 w-px h-6 bg-zk-accent',
+      '1,1-1,0': 'absolute -top-px left-1/2 w-px h-6 bg-zk-accent',
+      '0,1-1,1': 'absolute top-1/2 -right-px w-6 h-px bg-zk-accent',
+      '1,1-0,1': 'absolute top-1/2 -left-px w-6 h-px bg-zk-accent',
     };
     return connections[`${from}-${to}`] || '';
   };
 
   return (
-    <div className="relative">
-      <div className="grid grid-cols-2 gap-8 p-8">
+    <div className="relative max-w-4xl mx-auto">
+      <div className="grid grid-cols-2 gap-6">
         {nodes.map((node) => (
           <div key={node.id} className="relative">
             <NodeEditor node={node} onCodeChange={onCodeChange} />

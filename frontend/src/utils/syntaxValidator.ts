@@ -7,10 +7,12 @@ const INSTRUCTIONS: Record<string, { operandCount: number; validOperands?: Opera
   'NEG': { operandCount: 0, validOperands: [] },
   'JMP': { operandCount: 1 },
   'JEZ': { operandCount: 1 },
+  'JZ': { operandCount: 1 }, // Alias for JEZ
   'JNZ': { operandCount: 1 },
   'JGZ': { operandCount: 1 },
   'JLZ': { operandCount: 1 },
   'NOP': { operandCount: 0, validOperands: [] },
+  'HLT': { operandCount: 0, validOperands: [] }, // Halt instruction
 };
 
 const PORTS = ['UP', 'DOWN', 'LEFT', 'RIGHT'];

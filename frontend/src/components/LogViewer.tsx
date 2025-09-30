@@ -28,7 +28,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ executionLogs }) => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-zk-node border-t border-zk-border">
+    <div className="fixed bottom-0 left-0 right-0 bg-zk-node border-t border-zk-border z-50">
       <div className="flex items-center justify-between px-4 py-2 border-b border-zk-border">
         <button
           onClick={() => setShowLogs(!showLogs)}

@@ -83,7 +83,7 @@ export const NodeEditor: React.FC<NodeEditorProps> = ({ node, onCodeChange }) =>
             value={code}
             onChange={handleChange}
             className={`
-              w-full h-64 bg-transparent text-gray-100 
+              w-full h-48 bg-transparent text-gray-100 
               font-mono text-sm p-2 resize-none outline-none
               ${hasErrors ? 'text-red-100' : ''}
             `}

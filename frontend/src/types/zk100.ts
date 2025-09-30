@@ -7,8 +7,8 @@ export type NodeId = `${NodePosition['x']},${NodePosition['y']}`;
 
 export type Instruction = 
   | 'MOV' | 'ADD' | 'SUB' | 'NEG' 
-  | 'JMP' | 'JEZ' | 'JNZ' | 'JGZ' | 'JLZ'
-  | 'NOP';
+  | 'JMP' | 'JEZ' | 'JZ' | 'JNZ' | 'JGZ' | 'JLZ'
+  | 'NOP' | 'HLT';
 
 export type Operand = 
   | 'ACC' | 'NIL' | 'IN' | 'OUT' 

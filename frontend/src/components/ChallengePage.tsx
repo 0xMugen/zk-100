@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { NodeGrid } from './NodeGrid';
 import { ResultDisplay } from './ResultDisplay';
 import { LogViewer } from './LogViewer';
+import { DocsPanel } from './DocsPanel';
 import { executeProgram } from '../utils/api';
 import { decodeChallenge, challenges } from '../data/challenges';
 import { logger } from '../utils/logger';
@@ -11,6 +12,7 @@ import type { Node, ExecutionResult } from '../types/zk100';
 export const ChallengePage: React.FC = () => {
   const { challengeId } = useParams<{ challengeId: string }>();
   const navigate = useNavigate();
+  const [isDocsPanelOpen, setIsDocsPanelOpen] = useState(true);
   
   const [nodes, setNodes] = useState<Node[]>([
     { id: '0,0', position: { x: 0, y: 0 }, code: '', lines: [], hasError: false },
@@ -114,7 +116,8 @@ export const ChallengePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-zk-bg pb-72">
-      <div className="container mx-auto p-8">
+      <DocsPanel onToggle={setIsDocsPanelOpen} />
+      <div className={`transition-all duration-300 p-8 ${isDocsPanelOpen ? 'mr-96' : 'mr-12'}`}>
         <header className="text-center mb-8">
           <button
             onClick={() => navigate('/')}
