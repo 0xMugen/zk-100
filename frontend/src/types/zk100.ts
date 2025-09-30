@@ -56,6 +56,17 @@ export type ExecutionDebug = {
   nodes?: any;
   traces?: any;
   argsJson?: string;
+  scarbOutput?: string;
+  proveOutput?: string;
+  publicOutputs?: {
+    challenge_commit: string | null;
+    program_commit: string | null;
+    output_commit: string | null;
+    cycles: number;
+    msgs: number;
+    nodes_used: number;
+    solved: boolean;
+  };
 };
 
 export type ExecutionResult = {

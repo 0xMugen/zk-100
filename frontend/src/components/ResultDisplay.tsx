@@ -47,11 +47,53 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ result, isExecutin
           </div>
         )}
         
+        {/* Show PublicOutputs if available */}
+        {result.debug?.publicOutputs && (
+          <div className="mt-4">
+            <h4 className="text-gray-400 mb-2">Execution Results:</h4>
+            <div className="bg-black/50 rounded p-3 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-gray-300">
+                <div>Cycles: <span className="text-white">{result.debug.publicOutputs.cycles}</span></div>
+                <div>Messages: <span className="text-white">{result.debug.publicOutputs.msgs}</span></div>
+                <div>Nodes Used: <span className="text-white">{result.debug.publicOutputs.nodes_used}</span></div>
+                <div>Solved: <span className={result.debug.publicOutputs.solved ? "text-green-500" : "text-red-500"}>
+                  {result.debug.publicOutputs.solved ? "✓ Yes" : "✗ No"}
+                </span></div>
+              </div>
+              {result.debug.publicOutputs.output_commit && (
+                <div className="mt-2 text-xs text-gray-400">
+                  Output Commit: {result.debug.publicOutputs.output_commit}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Show Scarb Output */}
+        {result.debug?.scarbOutput && (
+          <div className="mt-4">
+            <h4 className="text-gray-400 mb-2">Cairo Execution Output:</h4>
+            <pre className="bg-black/50 rounded p-3 text-xs text-gray-300 overflow-x-auto max-h-40">
+              {result.debug.scarbOutput}
+            </pre>
+          </div>
+        )}
+
+        {/* Show Prove Output if available */}
+        {result.debug?.proveOutput && (
+          <div className="mt-4">
+            <h4 className="text-gray-400 mb-2">Proof Generation Output:</h4>
+            <pre className="bg-black/50 rounded p-3 text-xs text-gray-300 overflow-x-auto max-h-40">
+              {result.debug.proveOutput}
+            </pre>
+          </div>
+        )}
+
         {/* Show debug traces if available */}
         {result.debug?.traces && (
           <details className="mt-4">
-            <summary className="cursor-pointer text-gray-400 hover:text-white">
-              Show execution traces
+            <summary className="cursor-pointer text-gray-400 hover:text-white text-sm">
+              Show detailed execution traces
             </summary>
             <pre className="mt-2 text-xs text-gray-500 overflow-x-auto">
               {JSON.stringify(result.debug.traces, null, 2)}

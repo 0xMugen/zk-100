@@ -130,6 +130,9 @@ export async function executeProgram(nodes: Node[], inputs?: number[]): Promise<
           traces: data.traces,
           argsJson: data.argsJson,
           asmContent: data.asmContent,
+          scarbOutput: data.scarbOutput,
+          proveOutput: data.proveOutput,
+          publicOutputs: data.publicOutputs,
         }
       };
     }
@@ -196,6 +199,9 @@ export async function executeProgram(nodes: Node[], inputs?: number[]): Promise<
         traces: data.traces,
         argsJson: data.argsJson,
         asmContent: data.asmContent,
+        scarbOutput: data.scarbOutput,
+        proveOutput: data.proveOutput,
+        publicOutputs: data.publicOutputs,
       }
     };
     
