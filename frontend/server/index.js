@@ -45,7 +45,8 @@ function generateAsmContent(nodes) {
   for (const node of nodes) {
     const code = node.code.trim();
     if (code) {
-      asm += `NODE (${node.position.x},${node.position.y})\n`;
+      // Swap x,y to convert from frontend (col,row) to Cairo VM (row,col)
+      asm += `NODE (${node.position.y},${node.position.x})\n`;
       const lines = code.split('\n');
       for (const line of lines) {
         let trimmed = line.trim();

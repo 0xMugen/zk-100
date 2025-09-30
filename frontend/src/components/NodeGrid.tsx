@@ -10,14 +10,14 @@ interface NodeGridProps {
 export const NodeGrid: React.FC<NodeGridProps> = ({ nodes, onCodeChange }) => {
   const getConnectionStyle = (from: string, to: string) => {
     const connections: Record<string, string> = {
-      '0,0-1,0': 'absolute top-1/2 -right-px w-6 h-px bg-zk-accent',
-      '1,0-0,0': 'absolute top-1/2 -left-px w-6 h-px bg-zk-accent',
-      '0,0-0,1': 'absolute -bottom-px left-1/2 w-px h-6 bg-zk-accent',
-      '0,1-0,0': 'absolute -top-px left-1/2 w-px h-6 bg-zk-accent',
-      '1,0-1,1': 'absolute -bottom-px left-1/2 w-px h-6 bg-zk-accent',
-      '1,1-1,0': 'absolute -top-px left-1/2 w-px h-6 bg-zk-accent',
-      '0,1-1,1': 'absolute top-1/2 -right-px w-6 h-px bg-zk-accent',
-      '1,1-0,1': 'absolute top-1/2 -left-px w-6 h-px bg-zk-accent',
+      '0,0-0,1': 'absolute top-1/2 -right-px w-6 h-px bg-zk-accent',
+      '0,1-0,0': 'absolute top-1/2 -left-px w-6 h-px bg-zk-accent',
+      '0,0-1,0': 'absolute -bottom-px left-1/2 w-px h-6 bg-zk-accent',
+      '1,0-0,0': 'absolute -top-px left-1/2 w-px h-6 bg-zk-accent',
+      '0,1-1,1': 'absolute -bottom-px left-1/2 w-px h-6 bg-zk-accent',
+      '1,1-0,1': 'absolute -top-px left-1/2 w-px h-6 bg-zk-accent',
+      '1,0-1,1': 'absolute top-1/2 -right-px w-6 h-px bg-zk-accent',
+      '1,1-1,0': 'absolute top-1/2 -left-px w-6 h-px bg-zk-accent',
     };
     return connections[`${from}-${to}`] || '';
   };
@@ -43,23 +43,23 @@ export const NodeGrid: React.FC<NodeGridProps> = ({ nodes, onCodeChange }) => {
               <div className="text-xs text-gray-400">RIGHT</div>
             </div>
             
-            {/* Connections */}
+            {/* Connections - using VM coordinate system (row,col) */}
             {node.position.x === 0 && node.position.y === 0 && (
               <>
-                <div className={getConnectionStyle('0,0', '1,0')} />
                 <div className={getConnectionStyle('0,0', '0,1')} />
+                <div className={getConnectionStyle('0,0', '1,0')} />
               </>
             )}
             {node.position.x === 1 && node.position.y === 0 && (
               <>
-                <div className={getConnectionStyle('1,0', '0,0')} />
-                <div className={getConnectionStyle('1,0', '1,1')} />
+                <div className={getConnectionStyle('0,1', '0,0')} />
+                <div className={getConnectionStyle('0,1', '1,1')} />
               </>
             )}
             {node.position.x === 0 && node.position.y === 1 && (
               <>
-                <div className={getConnectionStyle('0,1', '0,0')} />
-                <div className={getConnectionStyle('0,1', '1,1')} />
+                <div className={getConnectionStyle('1,0', '0,0')} />
+                <div className={getConnectionStyle('1,0', '1,1')} />
               </>
             )}
             {node.position.x === 1 && node.position.y === 1 && (

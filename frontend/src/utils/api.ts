@@ -27,7 +27,8 @@ function generateAsmContent(nodes: Node[]): string {
   for (const node of nodes) {
     const code = node.code.trim();
     if (code) {
-      asm += `NODE (${node.position.x},${node.position.y})\n`;
+      // Swap x,y to convert from frontend (col,row) to Cairo VM (row,col)
+      asm += `NODE (${node.position.y},${node.position.x})\n`;
       const lines = code.split('\n');
       for (const line of lines) {
         let trimmed = line.trim();
@@ -163,7 +164,7 @@ export async function executeProgram(nodes: Node[], inputs?: number[]): Promise<
         const outputStr = data.traces.scarb.finalState.outputs;
         const matches = outputStr.match(/-?\d+/g);
         if (matches) {
-          matches.forEach(m => output.push(parseInt(m)));
+          matches.forEach((m: string) => output.push(parseInt(m)));
         }
       }
       

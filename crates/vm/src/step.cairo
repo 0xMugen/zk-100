@@ -29,7 +29,6 @@ struct ExecResult {
 
 // Step one cycle of the VM
 pub fn step_cycle(ref grid: GridState) -> StepResult {
-    println!("\n=== Cycle {} ===", grid.cycles);
     let mut all_halted = True;
     let mut any_progress = False;
     
@@ -53,6 +52,18 @@ pub fn step_cycle(ref grid: GridState) -> StepResult {
                                     PortTag::Left => 2,
                                     PortTag::Right => 3,
                                 };
+                                print!("  Port intent from ({},{}): ", r, c);
+                                if intent.is_read {
+                                    print!("READ from ");
+                                } else {
+                                    print!("WRITE {} to ", intent.value);
+                                }
+                                match intent.port {
+                                    PortTag::Up => println!("UP"),
+                                    PortTag::Down => println!("DOWN"),
+                                    PortTag::Left => println!("LEFT"),
+                                    PortTag::Right => println!("RIGHT"),
+                                }
                                 port_intents.append(intent);
                             },
                             Option::None => {}
@@ -146,6 +157,58 @@ fn execute_instruction_with_ports(grid: @GridState, node: @NodeState, inst: Inst
     let mut output: Option<u32> = Option::None;
     let mut consumed_input = false;
     
+    // Log the instruction being executed
+    print!("  Node ({},{}) PC={}: ", r, c, (*node).pc);
+    match inst.op {
+        Op::Mov => print!("MOV"),
+        Op::Add => print!("ADD"),
+        Op::Sub => print!("SUB"),
+        Op::Neg => print!("NEG"),
+        Op::Sav => print!("SAV"),
+        Op::Swp => print!("SWP"),
+        Op::Jmp => print!("JMP"),
+        Op::Jz => print!("JZ"),
+        Op::Jnz => print!("JNZ"),
+        Op::Jgz => print!("JGZ"),
+        Op::Jlz => print!("JLZ"),
+        Op::Nop => print!("NOP"),
+        Op::Hlt => print!("HLT"),
+    }
+    print!(" ");
+    
+    match inst.src {
+        Src::Lit(v) => print!("{}", v),
+        Src::Acc => print!("ACC"),
+        Src::Nil => print!("NIL"),
+        Src::In => print!("IN"),
+        Src::P(p) => {
+            match p {
+                PortTag::Up => print!("UP"),
+                PortTag::Down => print!("DOWN"),
+                PortTag::Left => print!("LEFT"),
+                PortTag::Right => print!("RIGHT"),
+            }
+        },
+        Src::Last => print!("LAST"),
+    }
+    print!(", ");
+    
+    match inst.dst {
+        Dst::Acc => print!("ACC"),
+        Dst::Nil => print!("NIL"),
+        Dst::Out => print!("OUT"),
+        Dst::P(p) => {
+            match p {
+                PortTag::Up => print!("UP"),
+                PortTag::Down => print!("DOWN"),
+                PortTag::Left => print!("LEFT"),
+                PortTag::Right => print!("RIGHT"),
+            }
+        },
+        Dst::Last => print!("LAST"),
+    }
+    print!(" (ACC={})", (*node).acc);
+    println!("");
     
     match inst.op {
         Op::Nop => {
@@ -431,22 +494,54 @@ fn get_port_intent(grid: @GridState, node: @NodeState, r: u32, c: u32) -> Option
 
 // Check if two port intents match (one read, one write on opposite sides)
 fn ports_match(intent1: @PortIntent, intent2: @PortIntent) -> bool {
+    println!("    Checking port match: ({},{}) vs ({},{})", *intent1.r, *intent1.c, *intent2.r, *intent2.c);
+    
     // One must be read, other must be write
     if *intent1.is_read == *intent2.is_read {
+        println!("      Both are same type (read/write), no match");
         return false;
     }
     
     // Check if they are neighbors with matching ports
     match get_neighbor_coords(*intent1.r, *intent1.c, *intent1.port) {
         Option::Some((nr, nc)) => {
+            print!("      Neighbor of ({},{}) via ", *intent1.r, *intent1.c);
+            match *intent1.port {
+                PortTag::Up => print!("UP"),
+                PortTag::Down => print!("DOWN"),
+                PortTag::Left => print!("LEFT"),
+                PortTag::Right => print!("RIGHT"),
+            }
+            println!(" is ({},{})", nr, nc);
             if nr == *intent2.r && nc == *intent2.c {
                 // intent2 must be using opposite port
-                opposite_port(*intent1.port) == *intent2.port
+                let opp = opposite_port(*intent1.port);
+                let matches = opp == *intent2.port;
+                print!("      Opposite port check: ");
+                match opp {
+                    PortTag::Up => print!("UP"),
+                    PortTag::Down => print!("DOWN"),
+                    PortTag::Left => print!("LEFT"),
+                    PortTag::Right => print!("RIGHT"),
+                }
+                print!(" vs ");
+                match *intent2.port {
+                    PortTag::Up => print!("UP"),
+                    PortTag::Down => print!("DOWN"),
+                    PortTag::Left => print!("LEFT"),
+                    PortTag::Right => print!("RIGHT"),
+                }
+                println!(" = {}", matches);
+                matches
             } else {
+                println!("      Not neighbors");
                 false
             }
         },
-        Option::None => false,
+        Option::None => {
+            println!("      No valid neighbor");
+            false
+        },
     }
 }
 

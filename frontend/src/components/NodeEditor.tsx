@@ -66,7 +66,7 @@ export const NodeEditor: React.FC<NodeEditorProps> = ({ node, onCodeChange }) =>
     <div className="bg-zk-node border border-zk-border rounded p-4 h-full">
       <div className="flex justify-between items-center mb-2">
         <span className="text-sm text-gray-400">
-          Node ({node.position.x},{node.position.y})
+          Node ({node.position.y},{node.position.x})
           {node.position.x === 0 && node.position.y === 0 && ' - IN'}
           {node.position.x === 1 && node.position.y === 1 && ' - OUT'}
         </span>
