@@ -122,11 +122,7 @@ function extractTrace(output) {
 app.post('/api/debug', async (req, res) => {
   const { nodes, inputs } = req.body;
   
-  console.log('=== Debug Execution Request ===');
-  console.log('Inputs:', inputs);
-  
   const asmContent = generateAsmContent(nodes);
-  console.log('Generated ASM:\n', asmContent);
   
   if (!asmContent.trim()) {
     return res.json({
@@ -153,13 +149,12 @@ app.post('/api/debug', async (req, res) => {
   try {
     // Write ASM file
     await writeFile(tempFile, asmContent);
-    console.log('ASM file written to:', tempFile);
     
-    // Step 1: Assemble with verbose output
-    console.log('\n=== Step 1: Assembling ===');
-    let assembleCommand = `RUST_LOG=debug cargo run --release -- assemble ${tempFile}`;
+    // Step 1: Assemble
+    let assembleCommand = `cargo run --release -- assemble ${tempFile}`;
     
     if (inputs && inputs.length > 0) {
+      // For now, use the same values for expected as inputs (game wants input=output)
       assembleCommand += ` -i ${inputs.join(',')} -e ${inputs.join(',')}`;
     }
     
@@ -169,17 +164,15 @@ app.post('/api/debug', async (req, res) => {
         timeout: 30000,
         maxBuffer: 1024 * 1024 * 10,
         shell: SHELL,
-        env: { ...process.env, RUST_LOG: 'debug' }
+        env: { ...process.env }
       });
       
       results.assembleTrace = extractTrace(stdout + '\n' + stderr);
-      console.log('Assemble completed successfully');
       
       // Read the generated args.json
       const argsPath = path.join(hostDir, 'args.json');
       try {
         results.argsJson = await readFile(argsPath, 'utf-8');
-        console.log('Generated args.json:', results.argsJson);
       } catch (e) {
         console.error('Failed to read args.json:', e);
       }
@@ -190,9 +183,8 @@ app.post('/api/debug', async (req, res) => {
       console.error('Assemble failed:', error.message);
     }
     
-    // Step 2: Run scarb execute with verbose output
+    // Step 2: Run scarb execute
     if (!results.assembleError) {
-      console.log('\n=== Step 2: Running Scarb Execute ===');
       
       // Copy args.json to exec directory
       await execAsync(
@@ -203,8 +195,7 @@ app.post('/api/debug', async (req, res) => {
       try {
         // Change to exec directory and run scarb execute
         const scarbCommand = `cd ${execDir} && scarb execute --arguments-file args.json --print-program-output`;
-        console.log('Running:', scarbCommand);
-        console.log('Exec directory:', execDir);
+        // Execute scarb
         
         const { stdout, stderr } = await execAsync(scarbCommand, {
           timeout: 30000,
@@ -214,25 +205,18 @@ app.post('/api/debug', async (req, res) => {
         });
         
         results.scarbTrace = extractTrace(stdout + '\n' + stderr);
-        console.log('Scarb stdout:', stdout);
-        console.log('Scarb stderr:', stderr);
-        console.log('Scarb execute completed');
-        
-        // Also store the raw output for debugging
+        // Store the raw output for debugging
         results.scarbOutput = stdout;
         
       } catch (error) {
         results.scarbError = error.message + '\n\nStdout:\n' + error.stdout + '\n\nStderr:\n' + error.stderr;
         results.scarbTrace = extractTrace((error.stdout || '') + '\n' + (error.stderr || ''));
         console.error('Scarb execute failed:', error.message);
-        console.error('Stdout:', error.stdout);
-        console.error('Stderr:', error.stderr);
       }
     }
     
-    // Step 3: Run prove with verbose output
+    // Step 3: Run prove
     if (!results.assembleError) {
-      console.log('\n=== Step 3: Running Prove ===');
       
       // Run cairo-prove from the same directory as scarb execute, with the same args.json
       const executable = 'target/dev/zk100_exec.executable.json';
@@ -240,8 +224,7 @@ app.post('/api/debug', async (req, res) => {
       
       // Change to exec directory and run cairo-prove, just like scarb execute
       let proveCommand = `cd ${execDir} && cairo-prove prove ${executable} ${proofPath} --arguments-file args.json`;
-      console.log('Running:', proveCommand);
-      console.log('Exec directory:', execDir);
+      // Execute cairo-prove
       
       try {
         const { stdout, stderr } = await execAsync(proveCommand, {
@@ -253,7 +236,6 @@ app.post('/api/debug', async (req, res) => {
         
         results.proveTrace = extractTrace(stdout + '\n' + stderr);
         results.success = true;
-        console.log('Prove completed successfully');
         
       } catch (error) {
         results.proveError = error.message;

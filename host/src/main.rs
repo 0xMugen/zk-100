@@ -7,7 +7,6 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "ZK-100 Host - Assembly to Proof Pipeline")]
@@ -32,23 +31,6 @@ enum Commands {
         #[arg(short = 'e', long)]
         expected: Option<String>,
     },
-    /// Generate and run proof
-    Prove {
-        /// Input assembly file
-        input: PathBuf,
-        /// Proof output file
-        #[arg(short, long, default_value = "proof.json")]
-        proof: PathBuf,
-        /// Cairo executable path
-        #[arg(long, default_value = "../crates/exec/target/dev/zk100_exec.executable.json")]
-        executable: PathBuf,
-        /// Input values (comma-separated)
-        #[arg(short = 'i', long)]
-        inputs: Option<String>,
-        /// Expected output values (comma-separated)
-        #[arg(short = 'e', long)]
-        expected: Option<String>,
-    },
 }
 
 fn main() -> Result<()> {
@@ -57,9 +39,6 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Assemble { input, output, inputs, expected } => {
             assemble_program(input, output, inputs, expected)?;
-        }
-        Commands::Prove { input, proof, executable, inputs, expected } => {
-            prove_program(input, proof, executable, inputs, expected)?;
         }
     }
     
@@ -102,42 +81,6 @@ fn assemble_program(
     println!("  Inputs: {:?}", inputs);
     println!("  Expected: {:?}", expected);
     println!("  Programs: {} words", prog_words.len());
-    
-    Ok(())
-}
-
-fn prove_program(
-    input_path: PathBuf,
-    proof_path: PathBuf,
-    executable_path: PathBuf,
-    inputs_str: Option<String>,
-    expected_str: Option<String>,
-) -> Result<()> {
-    // First assemble the program
-    let args_path = PathBuf::from("temp_args.json");
-    assemble_program(input_path, args_path.clone(), inputs_str, expected_str)?;
-    
-    // Run cairo-prove
-    println!("\nGenerating proof...");
-    let output = Command::new("cairo-prove")
-        .arg("prove")
-        .arg(&executable_path)
-        .arg(&proof_path)
-        .arg("--arguments-file")
-        .arg(&args_path)
-        .output()?;
-    
-    if !output.status.success() {
-        anyhow::bail!(
-            "cairo-prove failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    
-    // Clean up temp file
-    fs::remove_file(args_path).ok();
-    
-    println!("Proof generated successfully: {}", proof_path.display());
     
     Ok(())
 }
