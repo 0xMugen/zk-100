@@ -38,36 +38,15 @@ fn execute_zk100(
     // 4. Load programs into grid
     load_programs(ref grid, @programs);
     
-    // Debug: print loaded programs
-    println!("Loaded {} programs", programs.len());
-    let mut i = 0;
-    while i < programs.len() {
-        match programs.get(i) {
-            Option::Some(row_box) => {
-                let row = row_box.unbox();
-                println!("  Row {} has {} programs", i, row.len());
-            },
-            Option::None => {}
-        }
-        i += 1;
-    }
-    
     // 5. Load input stream
     load_inputs(ref grid, @inputs);
-    println!("Loaded inputs: {:?}", inputs);
     
     // 6. Execute VM until completion or timeout
-    println!("Starting VM execution...");
     let (final_grid, _result) = execute_vm(grid, MAX_CYCLES);
-    
-    // Print final output stream
-    println!("Final output stream: {:?}", final_grid.out_stream);
-    println!("Expected outputs: {:?}", expected);
     
     // 7. Check if target was achieved
     let solved = check_target(@final_grid, @expected);
-    println!("Program solved: {}", solved);
-    
+
     // 8. Compute commitments
     let challenge_commit = commit_challenge(@inputs, @expected);
     let output_commit = commit_outputs(@final_grid.out_stream);
@@ -115,9 +94,6 @@ fn expand_seed(seed: felt252) -> (GridState, Array<u32>, Array<u32>) {
 
 // Decode programs from flattened word array
 fn decode_programs(prog_words: @Array<felt252>) -> Array<Array<Array<Inst>>> {
-    println!("=== DECODING PROGRAMS ===");
-    println!("Total prog_words: {}", prog_words.len());
-    
     let mut programs = ArrayTrait::new();
     let mut word_idx = 0;
     
@@ -129,30 +105,23 @@ fn decode_programs(prog_words: @Array<felt252>) -> Array<Array<Array<Inst>>> {
         while c < GRID_W {
             let mut program = ArrayTrait::new();
             
-            println!("\n--- Position ({},{}) ---", r, c);
-            
             // Read program length
             if word_idx < prog_words.len() {
                 let prog_len: u32 = (*prog_words[word_idx]).try_into().unwrap();
-                println!("Program length: {}", prog_len);
                 word_idx += 1;
                 
                 // Read instructions
                 let mut i: u32 = 0;
                 while i < prog_len {
                     if word_idx >= prog_words.len() {
-                        println!("WARNING: Ran out of prog_words at instruction {}", i);
                         break;
                     }
                     let inst_word = *prog_words[word_idx];
-                    println!("  Instruction {}: raw word = {}", i, inst_word);
                     let inst = decode_instruction(inst_word);
                     program.append(inst);
                     word_idx += 1;
                     i += 1;
                 }
-            } else {
-                println!("No program at this position (out of words)");
             }
             
             row.append(program);
@@ -162,7 +131,6 @@ fn decode_programs(prog_words: @Array<felt252>) -> Array<Array<Array<Inst>>> {
         r += 1;
     }
     
-    println!("\n=== PROGRAMS DECODED ===\n");
     programs
 }
 
@@ -172,17 +140,12 @@ fn decode_instruction(word: felt252) -> Inst {
     // Format: lit(8) | src_port(2) | dst_port(2) | op(4) | src(8) | dst(8) = 32 bits
     let val: u32 = word.try_into().unwrap();
     
-    println!("    Decoding instruction from word: {}", val);
-    
     let lit_val = val / 0x1000000;                    // bits 24-31
     let src_port_val = (val / 0x400000) & 0x3;        // bits 22-23  
     let dst_port_val = (val / 0x100000) & 0x3;        // bits 20-21
     let op_val = (val / 0x10000) & 0xf;               // bits 16-19
     let src_val = (val / 0x100) & 0xff;               // bits 8-15
     let dst_val = val & 0xff;                         // bits 0-7
-    
-    println!("      lit={}, src_port={}, dst_port={}, op={}, src={}, dst={}", 
-             lit_val, src_port_val, dst_port_val, op_val, src_val, dst_val);
     
     // Decode operation
     let op = decode_op(op_val);
@@ -207,58 +170,6 @@ fn decode_instruction(word: felt252) -> Inst {
         Dst::P(decode_port_tag(dst_port_val))
     }
     else { Dst::Last };
-    
-    // Print decoded instruction
-    print!("      Decoded: ");
-    match op {
-        Op::Mov => print!("MOV"),
-        Op::Add => print!("ADD"),
-        Op::Sub => print!("SUB"),
-        Op::Neg => print!("NEG"),
-        Op::Sav => print!("SAV"),
-        Op::Swp => print!("SWP"),
-        Op::Jmp => print!("JMP"),
-        Op::Jz => print!("JZ"),
-        Op::Jnz => print!("JNZ"),
-        Op::Jgz => print!("JGZ"),
-        Op::Jlz => print!("JLZ"),
-        Op::Nop => print!("NOP"),
-        Op::Hlt => print!("HLT"),
-    }
-    print!(" ");
-    
-    match src {
-        Src::Lit(v) => print!("{}", v),
-        Src::Acc => print!("ACC"),
-        Src::Nil => print!("NIL"),
-        Src::In => print!("IN"),
-        Src::P(p) => {
-            match p {
-                PortTag::Up => print!("UP"),
-                PortTag::Down => print!("DOWN"),
-                PortTag::Left => print!("LEFT"),
-                PortTag::Right => print!("RIGHT"),
-            }
-        },
-        Src::Last => print!("LAST"),
-    }
-    print!(", ");
-    
-    match dst {
-        Dst::Acc => print!("ACC"),
-        Dst::Nil => print!("NIL"),
-        Dst::Out => print!("OUT"),
-        Dst::P(p) => {
-            match p {
-                PortTag::Up => print!("UP"),
-                PortTag::Down => print!("DOWN"),
-                PortTag::Left => print!("LEFT"),
-                PortTag::Right => print!("RIGHT"),
-            }
-        },
-        Dst::Last => print!("LAST"),
-    }
-    println!("");
     
     Inst { op, src, dst }
 }
@@ -290,8 +201,6 @@ fn decode_port_tag(val: u32) -> PortTag {
 
 // Load programs into grid
 fn load_programs(ref grid: GridState, programs: @Array<Array<Array<Inst>>>) {
-    println!("=== LOADING PROGRAMS INTO GRID ===");
-    
     // Clear existing programs and set new ones
     grid.progs = ArrayTrait::new();
     
@@ -306,66 +215,12 @@ fn load_programs(ref grid: GridState, programs: @Array<Array<Array<Inst>>>) {
                     match row.get(c) {
                         Option::Some(prog_box) => {
                             let prog = prog_box.unbox();
-                            println!("\nGrid position ({},{}) - {} instructions:", r, c, prog.len());
                             let mut new_prog = ArrayTrait::new();
                             let mut i = 0;
                             while i < prog.len() {
                                 match prog.get(i) {
                                     Option::Some(inst_box) => {
-                                        let inst = inst_box.unbox();
-                                        print!("  [{}] ", i);
-                                        // Print instruction details
-                                        match inst.op {
-                                            Op::Mov => print!("MOV"),
-                                            Op::Add => print!("ADD"),
-                                            Op::Sub => print!("SUB"),
-                                            Op::Neg => print!("NEG"),
-                                            Op::Sav => print!("SAV"),
-                                            Op::Swp => print!("SWP"),
-                                            Op::Jmp => print!("JMP"),
-                                            Op::Jz => print!("JZ"),
-                                            Op::Jnz => print!("JNZ"),
-                                            Op::Jgz => print!("JGZ"),
-                                            Op::Jlz => print!("JLZ"),
-                                            Op::Nop => print!("NOP"),
-                                            Op::Hlt => print!("HLT"),
-                                        }
-                                        print!(" ");
-                                        
-                                        match inst.src {
-                                            Src::Lit(v) => print!("{}", v),
-                                            Src::Acc => print!("ACC"),
-                                            Src::Nil => print!("NIL"),
-                                            Src::In => print!("IN"),
-                                            Src::P(p) => {
-                                                match p {
-                                                    PortTag::Up => print!("UP"),
-                                                    PortTag::Down => print!("DOWN"),
-                                                    PortTag::Left => print!("LEFT"),
-                                                    PortTag::Right => print!("RIGHT"),
-                                                }
-                                            },
-                                            Src::Last => print!("LAST"),
-                                        }
-                                        print!(", ");
-                                        
-                                        match inst.dst {
-                                            Dst::Acc => print!("ACC"),
-                                            Dst::Nil => print!("NIL"),
-                                            Dst::Out => print!("OUT"),
-                                            Dst::P(p) => {
-                                                match p {
-                                                    PortTag::Up => print!("UP"),
-                                                    PortTag::Down => print!("DOWN"),
-                                                    PortTag::Left => print!("LEFT"),
-                                                    PortTag::Right => print!("RIGHT"),
-                                                }
-                                            },
-                                            Dst::Last => print!("LAST"),
-                                        }
-                                        println!("");
-                                        
-                                        new_prog.append(*inst);
+                                        new_prog.append(*inst_box.unbox());
                                     },
                                     Option::None => { }
                                 }
@@ -374,7 +229,6 @@ fn load_programs(ref grid: GridState, programs: @Array<Array<Array<Inst>>>) {
                             prog_row.append(new_prog);
                         },
                         Option::None => {
-                            println!("\nGrid position ({},{}) - Empty program", r, c);
                             prog_row.append(ArrayTrait::new());
                         }
                     }
@@ -386,8 +240,6 @@ fn load_programs(ref grid: GridState, programs: @Array<Array<Array<Inst>>>) {
         }
         r += 1;
     }
-    
-    println!("\n=== PROGRAMS LOADED ===\n");
 }
 
 // Load input stream into grid
@@ -403,41 +255,17 @@ fn load_inputs(ref grid: GridState, inputs: @Array<u32>) {
 
 // Execute VM until completion or timeout
 fn execute_vm(mut grid: GridState, max_cycles: u64) -> (GridState, StepResult) {
-    println!("=== STARTING VM EXECUTION ===");
-    println!("Max cycles: {}", max_cycles);
-    
     let mut result = StepResult::Continue;
-    let mut last_log_cycle = 0;
     
     while grid.cycles < max_cycles {
-        // Log every 100 cycles or on first few cycles
-        if grid.cycles < 10 || grid.cycles - last_log_cycle >= 100 {
-            println!("Cycle {}: {} messages sent", grid.cycles, grid.msgs);
-            last_log_cycle = grid.cycles;
-        }
-        
         result = step_cycle(ref grid);
         
         match result {
             StepResult::Continue => { },
-            StepResult::Halted => { 
-                println!("VM halted at cycle {}", grid.cycles);
-                break; 
-            },
-            StepResult::Deadlock => { 
-                println!("VM deadlocked at cycle {}", grid.cycles);
-                break; 
-            },
+            StepResult::Halted => { break; },
+            StepResult::Deadlock => { break; },
         }
     }
-    
-    if grid.cycles >= max_cycles {
-        println!("VM reached max cycles limit: {}", max_cycles);
-    }
-    
-    println!("=== VM EXECUTION COMPLETE ===");
-    println!("Total cycles: {}", grid.cycles);
-    println!("Total messages: {}", grid.msgs);
     
     (grid, result)
 }

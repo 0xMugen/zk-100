@@ -34,8 +34,6 @@
 
             # Pinned Rust toolchain (includes rustc + cargo)
             rust
-
-            # Bun
             pkgs.bun
           ];
 
