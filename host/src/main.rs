@@ -83,6 +83,11 @@ fn assemble_program(
     // Encode programs to prog_words
     let prog_words = assembler::encode_programs(&programs)?;
     
+    println!("Encoded prog_words:");
+    for (i, word) in prog_words.iter().enumerate() {
+        println!("  [{}] = {}", i, word);
+    }
+    
     // Parse inputs and expected values
     let inputs = parse_u32_array(&inputs_str.unwrap_or_default());
     let expected = parse_u32_array(&expected_str.unwrap_or_default());
@@ -115,11 +120,10 @@ fn prove_program(
     // Run cairo-prove
     println!("\nGenerating proof...");
     let output = Command::new("cairo-prove")
+        .env("CAIRO_ARGS_FILE", &args_path)
         .arg("prove")
         .arg(&executable_path)
         .arg(&proof_path)
-        .arg("--arguments-file")
-        .arg(&args_path)
         .output()?;
     
     if !output.status.success() {
