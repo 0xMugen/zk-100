@@ -185,6 +185,9 @@ app.post('/api/debug', async (req, res) => {
     scarbError: null,
     proveError: null,
     argsJson: null,
+    publicOutputs: null,
+    scarbOutput: null,
+    proveOutput: null,
     success: false
   };
   
@@ -279,7 +282,8 @@ app.post('/api/debug', async (req, res) => {
         });
         
         results.proveTrace = extractTrace(stdout + '\n' + stderr);
-        results.proveOutput = stdout;
+        // Cairo-prove logs to stderr, so combine both for the output
+        results.proveOutput = (stdout + '\n' + stderr).trim();
         results.success = true;
         
       } catch (error) {

@@ -18,6 +18,8 @@ interface DebugResponse {
   argsJson?: string;
   asmContent?: string;
   scarbOutput?: string;
+  proveOutput?: string;
+  publicOutputs?: any;
   error?: string;
 }
 
