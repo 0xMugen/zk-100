@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { writeFile, unlink } from 'fs/promises';
+import { writeFile, unlink, readFile } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
@@ -14,7 +14,7 @@ const app = express();
 const PORT = 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Find available shell
 function findShell() {
@@ -33,7 +33,6 @@ function findShell() {
     }
   }
   
-  // Default to sh without path (should work on most systems)
   console.log('Using default shell: sh');
   return 'sh';
 }
@@ -51,15 +50,16 @@ function generateAsmContent(nodes) {
       for (const line of lines) {
         let trimmed = line.trim();
         if (trimmed && !trimmed.startsWith('#')) {
-          // Convert port names to P: format
-          trimmed = trimmed.replace(/\b(UP|DOWN|LEFT|RIGHT)\b/g, 'P:$1');
+          // Convert standalone port names to P: format (but not IN/OUT)
+          trimmed = trimmed.replace(/\b(UP|DOWN|LEFT|RIGHT)\b/g, (match) => {
+            return `P:${match}`;
+          });
           // Fix MOV syntax to use comma
           trimmed = trimmed.replace(/MOV\s+(\S+)\s+(\S+)/, 'MOV $1, $2');
-          // Add HLT if not present
           asm += `${trimmed}\n`;
         }
       }
-      // Add HLT at end of each node if not already present
+      // Add HLT if not present
       if (!code.includes('HLT')) {
         asm += `HLT\n`;
       }
@@ -70,46 +70,59 @@ function generateAsmContent(nodes) {
   return asm;
 }
 
-function extractErrorMessage(output) {
-  // Look for specific error patterns
-  if (output.includes('thread') && output.includes('panicked')) {
-    const panicMatch = output.match(/thread.*?panicked at ['"](.+?)['"]/);
-    if (panicMatch) return `Panic: ${panicMatch[1]}`;
+// Extract trace information from output
+function extractTrace(output) {
+  const trace = {
+    cycles: [],
+    instructions: [],
+    portMessages: [],
+    finalState: {},
+    errors: []
+  };
+  
+  const lines = output.split('\n');
+  
+  for (const line of lines) {
+    // Look for cycle information
+    if (line.includes('Cycle')) {
+      const cycleMatch = line.match(/Cycle\s+(\d+)/);
+      if (cycleMatch) {
+        trace.cycles.push(parseInt(cycleMatch[1]));
+      }
+    }
     
-    // Try to extract more context around panic
-    const lines = output.split('\n');
-    const panicIndex = lines.findIndex(line => line.includes('panicked'));
-    if (panicIndex >= 0) {
-      return lines.slice(Math.max(0, panicIndex - 1), panicIndex + 3).join('\n');
+    // Look for instruction traces
+    if (line.includes('Executing:') || line.includes('PC:')) {
+      trace.instructions.push(line);
+    }
+    
+    // Look for port communication
+    if (line.includes('Port') || line.includes('->')) {
+      trace.portMessages.push(line);
+    }
+    
+    // Look for final values
+    if (line.includes('Output:')) {
+      const outputMatch = line.match(/Output:\s*(.+)/);
+      if (outputMatch) {
+        trace.finalState.outputs = outputMatch[1];
+      }
+    }
+    
+    // Look for errors or panics
+    if (line.includes('Error') || line.includes('panic') || line.includes('assert')) {
+      trace.errors.push(line);
     }
   }
   
-  if (output.includes('error:')) {
-    const errorMatch = output.match(/error:\s*(.+?)$/m);
-    if (errorMatch) return errorMatch[1];
-  }
-  
-  if (output.includes('Error:')) {
-    const errorMatch = output.match(/Error:\s*(.+?)$/m);
-    if (errorMatch) return errorMatch[1];
-  }
-  
-  // Return first non-empty line that might be an error
-  const lines = output.split('\n').filter(line => line.trim());
-  return lines.find(line => 
-    line.includes('Error') || 
-    line.includes('error') || 
-    line.includes('failed') ||
-    line.includes('Failed')
-  ) || output || 'Execution failed';
+  return trace;
 }
 
-app.post('/api/execute', async (req, res) => {
+app.post('/api/debug', async (req, res) => {
   const { nodes, inputs } = req.body;
   
-  console.log('=== Execution Request ===');
+  console.log('=== Debug Execution Request ===');
   console.log('Inputs:', inputs);
-  console.log('Nodes:', JSON.stringify(nodes, null, 2));
   
   const asmContent = generateAsmContent(nodes);
   console.log('Generated ASM:\n', asmContent);
@@ -117,201 +130,242 @@ app.post('/api/execute', async (req, res) => {
   if (!asmContent.trim()) {
     return res.json({
       success: false,
-      error: 'No code to execute',
-      debug: {
-        nodes,
-        asmContent: '',
-      }
+      error: 'No code to execute'
     });
   }
 
-  const tempFile = path.join(tmpdir(), `zk100_${Date.now()}.asm`);
+  const tempFile = path.join(tmpdir(), `zk100_debug_${Date.now()}.asm`);
   const hostDir = path.join(__dirname, '../../host');
+  const execDir = path.join(__dirname, '../../crates/exec');
   
-  console.log('Temp file:', tempFile);
-  console.log('Host directory:', hostDir);
-  console.log('Shell:', SHELL);
+  let results = {
+    assembleTrace: null,
+    scarbTrace: null,
+    proveTrace: null,
+    assembleError: null,
+    scarbError: null,
+    proveError: null,
+    argsJson: null,
+    success: false
+  };
   
   try {
     // Write ASM file
     await writeFile(tempFile, asmContent);
-    console.log('ASM file written successfully');
+    console.log('ASM file written to:', tempFile);
     
-    // Build the command
-    let command = `cargo run --release -- prove ${tempFile}`;
+    // Step 1: Assemble with verbose output
+    console.log('\n=== Step 1: Assembling ===');
+    let assembleCommand = `RUST_LOG=debug cargo run --release -- assemble ${tempFile}`;
     
-    // Add inputs if provided
     if (inputs && inputs.length > 0) {
-      command += ` -i ${inputs.join(',')}`;
+      assembleCommand += ` -i ${inputs.join(',')} -e ${inputs.join(',')}`;
     }
-    
-    // Add expected outputs (for now, same as inputs for testing)
-    if (inputs && inputs.length > 0) {
-      command += ` -e ${inputs.join(',')}`;
-    }
-    
-    console.log('Command:', command);
-    console.log('Working directory:', hostDir);
-    
-    // Execute with Rust host
-    const startTime = Date.now();
     
     try {
-      const { stdout, stderr } = await execAsync(
-        command,
-        { 
-          cwd: hostDir,
-          timeout: 60000, // 60 second timeout
-          maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-          shell: SHELL,
-          env: { ...process.env }
-        }
+      const { stdout, stderr } = await execAsync(assembleCommand, {
+        cwd: hostDir,
+        timeout: 30000,
+        maxBuffer: 1024 * 1024 * 10,
+        shell: SHELL,
+        env: { ...process.env, RUST_LOG: 'debug' }
+      });
+      
+      results.assembleTrace = extractTrace(stdout + '\n' + stderr);
+      console.log('Assemble completed successfully');
+      
+      // Read the generated args.json
+      const argsPath = path.join(hostDir, 'args.json');
+      try {
+        results.argsJson = await readFile(argsPath, 'utf-8');
+        console.log('Generated args.json:', results.argsJson);
+      } catch (e) {
+        console.error('Failed to read args.json:', e);
+      }
+      
+    } catch (error) {
+      results.assembleError = error.message;
+      results.assembleTrace = extractTrace(error.stdout || '' + '\n' + (error.stderr || ''));
+      console.error('Assemble failed:', error.message);
+    }
+    
+    // Step 2: Run scarb execute with verbose output
+    if (!results.assembleError) {
+      console.log('\n=== Step 2: Running Scarb Execute ===');
+      
+      // Copy args.json to exec directory
+      await execAsync(
+        `cp ${path.join(hostDir, 'args.json')} ${path.join(execDir, 'args.json')}`,
+        { shell: SHELL }
       );
       
-      const executionTime = Date.now() - startTime;
-      
-      console.log('=== Execution Output ===');
-      console.log('STDOUT:', stdout);
-      console.log('STDERR:', stderr);
-      console.log('Execution time:', executionTime, 'ms');
-
-      // Capture all logs
-      const logs = {
-        stdout: stdout || '',
-        stderr: stderr || '',
-        cairoOutput: '',
-        proverOutput: '',
-        rustHostOutput: stdout || '',
-      };
-
-      // Parse different types of output
-      const output = [];
-      const lines = (stdout || '').split('\n');
-      
-      for (const line of lines) {
-        // Capture output values
-        if (line.includes('Output:')) {
-          const match = line.match(/Output:\s*(-?\d+)/);
-          if (match) {
-            output.push(parseInt(match[1]));
-            console.log('Found output:', match[1]);
-          }
-        }
-        
-        // Capture Cairo execution logs
-        if (line.includes('Cairo') || line.includes('scarb') || line.includes('Executing')) {
-          logs.cairoOutput += line + '\n';
-        }
-        
-        // Capture prover logs
-        if (line.includes('Proving') || line.includes('Proof') || line.includes('cairo-prove')) {
-          logs.proverOutput += line + '\n';
-        }
-      }
-
-      // Check for errors
-      const hasError = stderr || 
-        stdout.includes('Error') || 
-        stdout.includes('error:') || 
-        stdout.includes('thread') && stdout.includes('panicked') ||
-        stdout.includes('failed') ||
-        stdout.includes('FAILED');
-      
-      if (hasError) {
-        console.log('Error detected in output');
-        return res.json({
-          success: false,
-          error: stderr || extractErrorMessage(stdout),
-          output,
-          executionTime,
-          logs,
-          debug: {
-            asmContent,
-            command,
-            workingDir: hostDir,
+      try {
+        const { stdout, stderr } = await execAsync(
+          'RUST_LOG=trace scarb execute --arguments-file args.json --print-program-output',
+          {
+            cwd: execDir,
+            timeout: 30000,
+            maxBuffer: 1024 * 1024 * 10,
             shell: SHELL,
-            tempFile,
+            env: { ...process.env, RUST_LOG: 'trace' }
           }
-        });
+        );
+        
+        results.scarbTrace = extractTrace(stdout + '\n' + stderr);
+        console.log('Scarb execute completed');
+        
+      } catch (error) {
+        results.scarbError = error.message;
+        results.scarbTrace = extractTrace((error.stdout || '') + '\n' + (error.stderr || ''));
+        console.error('Scarb execute failed:', error.message);
       }
-
-      console.log('Execution successful, outputs:', output);
-      
-      res.json({
-        success: true,
-        output,
-        executionTime,
-        logs,
-        debug: {
-          asmContent,
-          command,
-          workingDir: hostDir,
-          shell: SHELL,
-          tempFile,
-        }
-      });
-      
-    } catch (execError) {
-      console.error('Exec error:', execError);
-      
-      // Handle execution errors
-      const errorMessage = execError.message || 'Unknown execution error';
-      const errorOutput = execError.stdout || '';
-      const errorStderr = execError.stderr || '';
-      
-      return res.json({
-        success: false,
-        error: `Execution failed: ${errorMessage}`,
-        output: [],
-        logs: {
-          stdout: errorOutput,
-          stderr: errorStderr,
-          cairoOutput: '',
-          proverOutput: '',
-          rustHostOutput: errorOutput + '\n' + errorStderr,
-        },
-        debug: {
-          asmContent,
-          command,
-          workingDir: hostDir,
-          shell: SHELL,
-          tempFile,
-          execError: {
-            message: errorMessage,
-            code: execError.code,
-            killed: execError.killed,
-            signal: execError.signal,
-          }
-        }
-      });
     }
-
+    
+    // Step 3: Run prove with verbose output
+    if (!results.assembleError) {
+      console.log('\n=== Step 3: Running Prove ===');
+      
+      let proveCommand = `RUST_LOG=debug cargo run --release -- prove ${tempFile}`;
+      if (inputs && inputs.length > 0) {
+        proveCommand += ` -i ${inputs.join(',')} -e ${inputs.join(',')}`;
+      }
+      
+      try {
+        const { stdout, stderr } = await execAsync(proveCommand, {
+          cwd: hostDir,
+          timeout: 60000,
+          maxBuffer: 1024 * 1024 * 10,
+          shell: SHELL,
+          env: { ...process.env, RUST_LOG: 'debug' }
+        });
+        
+        results.proveTrace = extractTrace(stdout + '\n' + stderr);
+        results.success = true;
+        console.log('Prove completed successfully');
+        
+      } catch (error) {
+        results.proveError = error.message;
+        results.proveTrace = extractTrace((error.stdout || '') + '\n' + (error.stderr || ''));
+        console.error('Prove failed:', error.message);
+      }
+    }
+    
+    // Send results
+    res.json({
+      success: results.success,
+      traces: {
+        assemble: results.assembleTrace,
+        scarb: results.scarbTrace,
+        prove: results.proveTrace
+      },
+      errors: {
+        assemble: results.assembleError,
+        scarb: results.scarbError,
+        prove: results.proveError
+      },
+      argsJson: results.argsJson,
+      asmContent: asmContent
+    });
+    
   } catch (error) {
     console.error('General error:', error);
     res.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      debug: {
-        asmContent,
-        tempFile,
-        hostDir,
-        shell: SHELL,
-        errorStack: error instanceof Error ? error.stack : undefined,
-      }
+      error: error.message,
+      traces: results
     });
   } finally {
     // Clean up temp file
     try {
       await unlink(tempFile);
-      console.log('Temp file cleaned up');
     } catch (e) {
       console.log('Failed to clean up temp file:', e.message);
     }
   }
 });
 
+// Regular execution endpoint (simpler, without debug info)
+app.post('/api/execute', async (req, res) => {
+  const { nodes, inputs } = req.body;
+  
+  const asmContent = generateAsmContent(nodes);
+  
+  if (!asmContent.trim()) {
+    return res.json({
+      success: false,
+      error: 'No code to execute'
+    });
+  }
+
+  const tempFile = path.join(tmpdir(), `zk100_${Date.now()}.asm`);
+  const hostDir = path.join(__dirname, '../../host');
+  const execDir = path.join(__dirname, '../../crates/exec');
+  
+  try {
+    await writeFile(tempFile, asmContent);
+    
+    // Assemble
+    let assembleCommand = `cargo run --release -- assemble ${tempFile}`;
+    if (inputs && inputs.length > 0) {
+      assembleCommand += ` -i ${inputs.join(',')} -e ${inputs.join(',')}`;
+    }
+    
+    await execAsync(assembleCommand, {
+      cwd: hostDir,
+      shell: SHELL
+    });
+    
+    // Copy args.json
+    await execAsync(
+      `cp ${path.join(hostDir, 'args.json')} ${path.join(execDir, 'args.json')}`,
+      { shell: SHELL }
+    );
+    
+    // Execute
+    const { stdout: scarbOut } = await execAsync(
+      'scarb execute --arguments-file args.json --print-program-output',
+      {
+        cwd: execDir,
+        shell: SHELL
+      }
+    );
+    
+    // Extract output
+    const output = [];
+    const lines = scarbOut.split('\n');
+    for (const line of lines) {
+      if (line.includes('Output:')) {
+        const match = line.match(/Output:\s*(-?\d+)/);
+        if (match) {
+          output.push(parseInt(match[1]));
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      output,
+      logs: {
+        cairoOutput: scarbOut
+      }
+    });
+    
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message
+    });
+  } finally {
+    try {
+      await unlink(tempFile);
+    } catch (e) {}
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`ZK-100 backend server running on http://localhost:${PORT}`);
+  console.log(`ZK-100 debug server running on http://localhost:${PORT}`);
   console.log(`Using shell: ${SHELL}`);
   console.log(`Host directory: ${path.join(__dirname, '../../host')}`);
+  console.log('Debug endpoint: POST /api/debug');
+  console.log('Execute endpoint: POST /api/execute');
 });

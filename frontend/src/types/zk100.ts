@@ -42,6 +42,7 @@ export type ExecutionLogs = {
 export type ExecutionDebug = {
   asmContent?: string;
   command?: string;
+  commands?: Array<{ desc: string; cmd: string }>;
   workingDir?: string;
   shell?: string;
   tempFile?: string;
@@ -53,6 +54,8 @@ export type ExecutionDebug = {
   };
   errorStack?: string;
   nodes?: any;
+  traces?: any;
+  argsJson?: string;
 };
 
 export type ExecutionResult = {
