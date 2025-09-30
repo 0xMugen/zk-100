@@ -71,6 +71,48 @@ function generateAsmContent(nodes) {
   return asm;
 }
 
+// Parse PublicOutputs from scarb execute output
+function parsePublicOutputs(output) {
+  const result = {
+    challenge_commit: null,
+    program_commit: null,
+    output_commit: null,
+    cycles: 0,
+    msgs: 0,
+    nodes_used: 0,
+    solved: false
+  };
+  
+  const lines = output.split('\n');
+  const programOutputIndex = lines.findIndex(line => line.includes('Program output:'));
+  
+  if (programOutputIndex !== -1 && programOutputIndex + 8 < lines.length) {
+    // The output format is:
+    // [0] array length (should be 7)
+    // [1] challenge_commit
+    // [2] program_commit  
+    // [3] output_commit
+    // [4] cycles
+    // [5] msgs
+    // [6] nodes_used
+    // [7] solved (1 or 0)
+    
+    try {
+      result.challenge_commit = lines[programOutputIndex + 2].trim();
+      result.program_commit = lines[programOutputIndex + 3].trim();
+      result.output_commit = lines[programOutputIndex + 4].trim();
+      result.cycles = parseInt(lines[programOutputIndex + 5].trim()) || 0;
+      result.msgs = parseInt(lines[programOutputIndex + 6].trim()) || 0;
+      result.nodes_used = parseInt(lines[programOutputIndex + 7].trim()) || 0;
+      result.solved = lines[programOutputIndex + 8].trim() === '1';
+    } catch (e) {
+      console.error('Failed to parse PublicOutputs:', e);
+    }
+  }
+  
+  return result;
+}
+
 // Extract trace information from output
 function extractTrace(output) {
   const trace = {
@@ -207,6 +249,8 @@ app.post('/api/debug', async (req, res) => {
         results.scarbTrace = extractTrace(stdout + '\n' + stderr);
         // Store the raw output for debugging
         results.scarbOutput = stdout;
+        // Parse the PublicOutputs from scarb
+        results.publicOutputs = parsePublicOutputs(stdout);
         
       } catch (error) {
         results.scarbError = error.message + '\n\nStdout:\n' + error.stdout + '\n\nStderr:\n' + error.stderr;
@@ -235,6 +279,7 @@ app.post('/api/debug', async (req, res) => {
         });
         
         results.proveTrace = extractTrace(stdout + '\n' + stderr);
+        results.proveOutput = stdout;
         results.success = true;
         
       } catch (error) {
@@ -257,9 +302,11 @@ app.post('/api/debug', async (req, res) => {
         scarb: results.scarbError,
         prove: results.proveError
       },
+      publicOutputs: results.publicOutputs || {},
       argsJson: results.argsJson,
       asmContent: asmContent,
-      scarbOutput: results.scarbOutput
+      scarbOutput: results.scarbOutput,
+      proveOutput: results.proveOutput
     });
     
   } catch (error) {

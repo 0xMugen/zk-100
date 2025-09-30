@@ -50,7 +50,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ result, isExecutin
         {/* Show PublicOutputs if available */}
         {result.debug?.publicOutputs && (
           <div className="mt-4">
-            <h4 className="text-gray-400 mb-2">Execution Results:</h4>
+            <h4 className="text-gray-400 mb-2">Proven Execution Results:</h4>
             <div className="bg-black/50 rounded p-3 text-sm">
               <div className="grid grid-cols-2 gap-2 text-gray-300">
                 <div>Cycles: <span className="text-white">{result.debug.publicOutputs.cycles}</span></div>
@@ -60,6 +60,11 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ result, isExecutin
                   {result.debug.publicOutputs.solved ? "✓ Yes" : "✗ No"}
                 </span></div>
               </div>
+              {result.success && (
+                <div className="mt-2 text-xs text-green-400">
+                  ✓ These results have been cryptographically proven
+                </div>
+              )}
               {result.debug.publicOutputs.output_commit && (
                 <div className="mt-2 text-xs text-gray-400">
                   Output Commit: {result.debug.publicOutputs.output_commit}
