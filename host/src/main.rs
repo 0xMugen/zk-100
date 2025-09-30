@@ -120,10 +120,11 @@ fn prove_program(
     // Run cairo-prove
     println!("\nGenerating proof...");
     let output = Command::new("cairo-prove")
-        .env("CAIRO_ARGS_FILE", &args_path)
         .arg("prove")
         .arg(&executable_path)
         .arg(&proof_path)
+        .arg("--arguments-file")
+        .arg(&args_path)
         .output()?;
     
     if !output.status.success() {

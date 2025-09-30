@@ -234,18 +234,21 @@ app.post('/api/debug', async (req, res) => {
     if (!results.assembleError) {
       console.log('\n=== Step 3: Running Prove ===');
       
-      let proveCommand = `RUST_LOG=debug cargo run --release -- prove ${tempFile}`;
-      if (inputs && inputs.length > 0) {
-        proveCommand += ` -i ${inputs.join(',')} -e ${inputs.join(',')}`;
-      }
+      // Run cairo-prove from the same directory as scarb execute, with the same args.json
+      const executable = 'target/dev/zk100_exec.executable.json';
+      const proofPath = 'proof.json';
+      
+      // Change to exec directory and run cairo-prove, just like scarb execute
+      let proveCommand = `cd ${execDir} && cairo-prove prove ${executable} ${proofPath} --arguments-file args.json`;
+      console.log('Running:', proveCommand);
+      console.log('Exec directory:', execDir);
       
       try {
         const { stdout, stderr } = await execAsync(proveCommand, {
-          cwd: hostDir,
           timeout: 60000,
           maxBuffer: 1024 * 1024 * 10,
           shell: SHELL,
-          env: { ...process.env, RUST_LOG: 'debug' }
+          env: { ...process.env }
         });
         
         results.proveTrace = extractTrace(stdout + '\n' + stderr);
