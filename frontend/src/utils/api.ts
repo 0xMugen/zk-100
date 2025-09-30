@@ -2,14 +2,14 @@ import type { Node, ExecutionResult } from '../types/zk100';
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
-export async function executeProgram(nodes: Node[]): Promise<ExecutionResult> {
+export async function executeProgram(nodes: Node[], inputs?: number[]): Promise<ExecutionResult> {
   try {
     const response = await fetch(`${API_BASE_URL}/execute`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ nodes }),
+      body: JSON.stringify({ nodes, inputs }),
     });
 
     if (!response.ok) {

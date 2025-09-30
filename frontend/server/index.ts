@@ -21,6 +21,7 @@ interface Node {
 
 interface ExecuteRequest {
   nodes: Node[];
+  inputs?: number[];
 }
 
 function generateAsmContent(nodes: Node[]): string {
@@ -44,8 +45,35 @@ function generateAsmContent(nodes: Node[]): string {
   return asm;
 }
 
+function extractErrorMessage(output: string): string {
+  // Look for specific error patterns
+  if (output.includes('thread') && output.includes('panicked')) {
+    const panicMatch = output.match(/thread.*?panicked at ['"](.+?)['"]/);
+    if (panicMatch) return `Panic: ${panicMatch[1]}`;
+  }
+  
+  if (output.includes('error:')) {
+    const errorMatch = output.match(/error:\s*(.+?)$/m);
+    if (errorMatch) return errorMatch[1];
+  }
+  
+  if (output.includes('Error:')) {
+    const errorMatch = output.match(/Error:\s*(.+?)$/m);
+    if (errorMatch) return errorMatch[1];
+  }
+  
+  // Return first non-empty line that might be an error
+  const lines = output.split('\n').filter(line => line.trim());
+  return lines.find(line => 
+    line.includes('Error') || 
+    line.includes('error') || 
+    line.includes('failed') ||
+    line.includes('Failed')
+  ) || 'Execution failed';
+}
+
 app.post('/api/execute', async (req, res) => {
-  const { nodes } = req.body as ExecuteRequest;
+  const { nodes, inputs } = req.body as ExecuteRequest;
   
   const asmContent = generateAsmContent(nodes);
   if (!asmContent.trim()) {
@@ -61,36 +89,72 @@ app.post('/api/execute', async (req, res) => {
     // Write ASM file
     await writeFile(tempFile, asmContent);
     
+    // Create input string for the Rust host
+    const inputArgs = inputs && inputs.length > 0 ? inputs.join(' ') : '';
+    
     // Execute with Rust host
     const startTime = Date.now();
+    const command = inputArgs 
+      ? `echo "${inputArgs}" | cargo run --release -- ${tempFile} 2>&1`
+      : `cargo run --release -- ${tempFile} 2>&1`;
+      
     const { stdout, stderr } = await execAsync(
-      `cargo run --release -- ${tempFile}`,
+      command,
       { 
         cwd: path.join(__dirname, '../../host'),
-        timeout: 30000 // 30 second timeout
+        timeout: 30000, // 30 second timeout
+        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+        shell: '/bin/bash'
       }
     );
     const executionTime = Date.now() - startTime;
 
-    // Parse output
+    // Capture all logs
+    const logs = {
+      stdout: stdout,
+      stderr: stderr,
+      cairoOutput: '',
+      proverOutput: '',
+      rustHostOutput: '',
+    };
+
+    // Parse different types of output
     const output: number[] = [];
     const lines = stdout.split('\n');
     
     for (const line of lines) {
+      // Capture output values
       if (line.includes('Output:')) {
-        const match = line.match(/Output: (\d+)/);
+        const match = line.match(/Output: (-?\d+)/);
         if (match) {
           output.push(parseInt(match[1]));
         }
       }
+      
+      // Capture Cairo execution logs
+      if (line.includes('Cairo') || line.includes('scarb')) {
+        logs.cairoOutput += line + '\n';
+      }
+      
+      // Capture prover logs
+      if (line.includes('Proving') || line.includes('Proof') || line.includes('cairo-prove')) {
+        logs.proverOutput += line + '\n';
+      }
+      
+      // All rust host output
+      logs.rustHostOutput += line + '\n';
     }
 
     // Check for errors
-    if (stderr || stdout.includes('Error')) {
+    const hasError = stderr || stdout.includes('Error') || stdout.includes('error:') || stdout.includes('thread') && stdout.includes('panicked');
+    
+    if (hasError) {
       return res.json({
         success: false,
-        error: stderr || 'Execution failed',
+        error: stderr || extractErrorMessage(stdout),
+        output,
         executionTime,
+        logs,
       });
     }
 
@@ -98,6 +162,7 @@ app.post('/api/execute', async (req, res) => {
       success: true,
       output,
       executionTime,
+      logs,
     });
 
   } catch (error) {

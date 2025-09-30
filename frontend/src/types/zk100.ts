@@ -31,9 +31,18 @@ export type Node = {
   hasError: boolean;
 };
 
+export type ExecutionLogs = {
+  stdout: string;
+  stderr: string;
+  cairoOutput: string;
+  proverOutput: string;
+  rustHostOutput: string;
+};
+
 export type ExecutionResult = {
   success: boolean;
   output?: number[];
   error?: string;
   executionTime?: number;
+  logs?: ExecutionLogs;
 };

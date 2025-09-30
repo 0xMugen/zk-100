@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { validateCode } from '../utils/syntaxValidator';
+import { logger } from '../utils/logger';
 import type { Node, CodeLine } from '../types/zk100';
 
 interface NodeEditorProps {
@@ -14,7 +15,10 @@ export const NodeEditor: React.FC<NodeEditorProps> = ({ node, onCodeChange }) =>
   useEffect(() => {
     const validatedLines = validateCode(code, node.position);
     setLines(validatedLines);
-  }, [code, node.position]);
+    
+    const errors = validatedLines.filter(line => line.error).map(line => line.error);
+    logger.logValidation(node.id, errors);
+  }, [code, node.position, node.id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newCode = e.target.value;
