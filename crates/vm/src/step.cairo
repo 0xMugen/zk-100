@@ -80,6 +80,7 @@ pub fn step_cycle(ref grid: GridState) -> StepResult {
                                 if r == 1 && c == 1 {
                                     match result.output {
                                         Option::Some(val) => {
+                                            println!("Node (1,1) outputting value: {}", val);
                                             grid.out_stream.append(val);
                                             grid.msgs += 1;
                                         },
@@ -149,8 +150,10 @@ fn execute_instruction_with_ports(grid: @GridState, node: @NodeState, inst: Inst
             match read_source_with_ports(grid, @new_node, inst.src, r, c, port_match) {
                 Option::Some((val, consumed)) => {
                     consumed_input = consumed;
+                    println!("MOV at ({},{}) read value: {}", r, c, val);
                     match write_destination_with_ports(ref new_node, inst.dst, val, port_match) {
                         Option::Some(out_val) => {
+                            println!("MOV at ({},{}) writing to OUT: {}", r, c, out_val);
                             output = Option::Some(out_val);
                             new_node.pc += 1;
                         },

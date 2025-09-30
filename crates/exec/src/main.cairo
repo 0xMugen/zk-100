@@ -32,7 +32,7 @@ fn execute_zk100(
     // 2. Decode programs from prog_words
     let programs = decode_programs(@prog_words);
     
-    // 3. Compute program commitment for later use
+    // 3. Compute program commitment (Cairo now owns this calculation)
     let prog_merkle_root = commit_programs(@programs);
     
     // 4. Load programs into grid
@@ -40,12 +40,19 @@ fn execute_zk100(
     
     // 5. Load input stream
     load_inputs(ref grid, @inputs);
+    println!("Loaded inputs: {:?}", inputs);
     
     // 6. Execute VM until completion or timeout
+    println!("Starting VM execution...");
     let (final_grid, _result) = execute_vm(grid, MAX_CYCLES);
+    
+    // Print final output stream
+    println!("Final output stream: {:?}", final_grid.out_stream);
+    println!("Expected outputs: {:?}", expected);
     
     // 7. Check if target was achieved
     let solved = check_target(@final_grid, @expected);
+    println!("Program solved: {}", solved);
     
     // 8. Compute commitments
     let challenge_commit = commit_challenge(@inputs, @expected);
@@ -524,9 +531,7 @@ mod tests {
         prog_words.append(0); // Program length marker
         prog_words.append(0); // Instruction word
         
-        let prog_merkle_root = commit_programs(@decode_programs(@prog_words));
-        
-        let result = execute_zk100(inputs, expected, prog_merkle_root, prog_words);
+        let result = execute_zk100(inputs, expected, prog_words);
         
         // Check result is properly serialized
         assert_eq!(result.len(), 7, "Result should have 7 elements");
@@ -605,16 +610,12 @@ mod tests {
         
         let prog_words = create_test_programs(node_programs);
         
-        // Calculate merkle root
-        let programs = decode_programs(@prog_words);
-        let prog_merkle_root = commit_programs(@programs);
-        
         // Create empty input and expected output
         let inputs = ArrayTrait::new();
         let expected = ArrayTrait::new();
         
         // Execute
-        let result = execute_zk100(inputs, expected, prog_merkle_root, prog_words);
+        let result = execute_zk100(inputs, expected, prog_words);
         
         // Check result
         assert!(result.len() > 0, "Should return results");
@@ -645,16 +646,13 @@ mod tests {
         
         let prog_words = create_test_programs(node_programs);
         
-        // Calculate merkle root
-        let programs = decode_programs(@prog_words);
-        let prog_merkle_root = commit_programs(@programs);
         
         // Create empty input and expected output (no I/O needed)
         let inputs = ArrayTrait::new();
         let expected = ArrayTrait::new();
         
         // Execute
-        let result = execute_zk100(inputs, expected, prog_merkle_root, prog_words);
+        let result = execute_zk100(inputs, expected, prog_words);
         
         // Check result
         match deserialize_public_outputs(@result) {
@@ -680,16 +678,12 @@ mod tests {
         
         let prog_words = create_test_programs(node_programs);
         
-        // Calculate merkle root
-        let programs = decode_programs(@prog_words);
-        let prog_merkle_root = commit_programs(@programs);
-        
         // Create empty input and expected output
         let inputs = ArrayTrait::new();
         let expected = ArrayTrait::new();
         
         // Execute
-        let result = execute_zk100(inputs, expected, prog_merkle_root, prog_words);
+        let result = execute_zk100(inputs, expected, prog_words);
         
         // Check result
         match deserialize_public_outputs(@result) {
@@ -722,16 +716,12 @@ mod tests {
         
         let prog_words = create_test_programs(node_programs);
         
-        // Calculate merkle root
-        let programs = decode_programs(@prog_words);
-        let prog_merkle_root = commit_programs(@programs);
-        
         // Create empty input and expected output
         let inputs = ArrayTrait::new();
         let expected = ArrayTrait::new();
         
         // Execute
-        let result = execute_zk100(inputs, expected, prog_merkle_root, prog_words);
+        let result = execute_zk100(inputs, expected, prog_words);
         
         // Check result
         match deserialize_public_outputs(@result) {
@@ -765,9 +755,6 @@ mod tests {
         
         let prog_words = create_test_programs(node_programs);
         
-        // Calculate merkle root
-        let programs = decode_programs(@prog_words);
-        let prog_merkle_root = commit_programs(@programs);
         
         // Create input and expected output
         let mut inputs = ArrayTrait::new();
@@ -777,7 +764,7 @@ mod tests {
         expected.append(42);
         
         // Execute
-        let result = execute_zk100(inputs, expected, prog_merkle_root, prog_words);
+        let result = execute_zk100(inputs, expected, prog_words);
         
         // Check result
         match deserialize_public_outputs(@result) {
@@ -817,9 +804,6 @@ mod tests {
         
         let prog_words = create_test_programs(node_programs);
         
-        // Calculate merkle root
-        let programs = decode_programs(@prog_words);
-        let prog_merkle_root = commit_programs(@programs);
         
         // Create input and expected output - single value
         let mut inputs = ArrayTrait::new();
@@ -829,7 +813,7 @@ mod tests {
         expected.append(42);
         
         // Execute
-        let result = execute_zk100(inputs, expected, prog_merkle_root, prog_words);
+        let result = execute_zk100(inputs, expected, prog_words);
         
         // Check result
         match deserialize_public_outputs(@result) {
