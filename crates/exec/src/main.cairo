@@ -38,6 +38,20 @@ fn execute_zk100(
     // 4. Load programs into grid
     load_programs(ref grid, @programs);
     
+    // Debug: print loaded programs
+    println!("Loaded {} programs", programs.len());
+    let mut i = 0;
+    while i < programs.len() {
+        match programs.get(i) {
+            Option::Some(row_box) => {
+                let row = row_box.unbox();
+                println!("  Row {} has {} programs", i, row.len());
+            },
+            Option::None => {}
+        }
+        i += 1;
+    }
+    
     // 5. Load input stream
     load_inputs(ref grid, @inputs);
     println!("Loaded inputs: {:?}", inputs);

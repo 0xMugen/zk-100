@@ -29,6 +29,7 @@ struct ExecResult {
 
 // Step one cycle of the VM
 pub fn step_cycle(ref grid: GridState) -> StepResult {
+    println!("\n=== Cycle {} ===", grid.cycles);
     let mut all_halted = True;
     let mut any_progress = False;
     
@@ -46,6 +47,12 @@ pub fn step_cycle(ref grid: GridState) -> StepResult {
                         // Check what this node wants to do with ports
                         match get_port_intent(@grid, node, r, c) {
                             Option::Some(intent) => {
+                                let port_num = match intent.port {
+                                    PortTag::Up => 0,
+                                    PortTag::Down => 1,
+                                    PortTag::Left => 2,
+                                    PortTag::Right => 3,
+                                };
                                 port_intents.append(intent);
                             },
                             Option::None => {}
@@ -139,11 +146,13 @@ fn execute_instruction_with_ports(grid: @GridState, node: @NodeState, inst: Inst
     let mut output: Option<u32> = Option::None;
     let mut consumed_input = false;
     
+    
     match inst.op {
         Op::Nop => {
             new_node.pc += 1;
         },
         Op::Hlt => {
+            println!("Node ({},{}) halting at PC={}", r, c, (*node).pc);
             new_node.halted = true;
         },
         Op::Mov => {
