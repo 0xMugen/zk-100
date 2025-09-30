@@ -1,6 +1,6 @@
 mod assembler;
 mod instruction;
-mod merkle;
+// mod merkle;  // No longer needed - Cairo computes merkle roots
 mod cairo_abi;
 
 use anyhow::Result;
@@ -83,15 +83,12 @@ fn assemble_program(
     // Encode programs to prog_words
     let prog_words = assembler::encode_programs(&programs)?;
     
-    // Calculate merkle root
-    let merkle_root = merkle::compute_program_merkle_root(&programs)?;
-    
     // Parse inputs and expected values
     let inputs = parse_u32_array(&inputs_str.unwrap_or_default());
     let expected = parse_u32_array(&expected_str.unwrap_or_default());
     
-    // Generate Cairo ABI format args
-    let args = cairo_abi::generate_args(&inputs, &expected, &merkle_root, &prog_words)?;
+    // Generate Cairo ABI format args (Cairo will compute merkle root)
+    let args = cairo_abi::generate_args(&inputs, &expected, &prog_words)?;
     
     // Write to output file
     fs::write(&output_path, serde_json::to_string(&args)?)?;
@@ -99,7 +96,6 @@ fn assemble_program(
     println!("Generated args file: {}", output_path.display());
     println!("  Inputs: {:?}", inputs);
     println!("  Expected: {:?}", expected);
-    println!("  Merkle root: 0x{}", hex::encode(&merkle_root));
     println!("  Programs: {} words", prog_words.len());
     
     Ok(())

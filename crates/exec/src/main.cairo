@@ -2,8 +2,8 @@ use core::array::ArrayTrait;
 use core::option::Option;
 
 #[executable]
-fn main(inputs: Array<u32>, expected: Array<u32>, prog_merkle_root: felt252, prog_words: Array<felt252>) -> Array<felt252> {
-    execute_zk100(inputs, expected, prog_merkle_root, prog_words)
+fn main(inputs: Array<u32>, expected: Array<u32>, prog_words: Array<felt252>) -> Array<felt252> {
+    execute_zk100(inputs, expected, prog_words)
 }
 
 use zk100_vm::{
@@ -24,7 +24,6 @@ const MAX_CYCLES: u64 = 10000;
 fn execute_zk100(    
     inputs: Array<u32>,
     expected: Array<u32>,
-    prog_merkle_root: felt252,
     prog_words: Array<felt252>
 ) -> Array<felt252> {
     // 1. Expand seed to generate initial state and target
@@ -33,10 +32,8 @@ fn execute_zk100(
     // 2. Decode programs from prog_words
     let programs = decode_programs(@prog_words);
     
-    // 3. Verify program commitment matches
-    let computed_root = commit_programs(@programs);
-    // Temporarily skip merkle root check for testing
-    assert(computed_root == prog_merkle_root, 'Invalid program commitment');
+    // 3. Compute program commitment for later use
+    let prog_merkle_root = commit_programs(@programs);
     
     // 4. Load programs into grid
     load_programs(ref grid, @programs);
