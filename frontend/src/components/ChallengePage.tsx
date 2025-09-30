@@ -184,7 +184,7 @@ export const ChallengePage: React.FC = () => {
         <ResultDisplay result={result} isExecuting={isExecuting} />
       </div>
       
-      <LogViewer executionLogs={result?.logs} />
+      <LogViewer executionLogs={result?.logs} executionDebug={result?.debug} />
     </div>
   );
 };

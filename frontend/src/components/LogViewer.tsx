@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { logger } from '../utils/logger';
-import type { ExecutionLogs } from '../types/zk100';
+import type { ExecutionLogs, ExecutionDebug } from '../types/zk100';
 
 interface LogViewerProps {
   executionLogs?: ExecutionLogs;
+  executionDebug?: ExecutionDebug;
 }
 
-export const LogViewer: React.FC<LogViewerProps> = ({ executionLogs }) => {
+export const LogViewer: React.FC<LogViewerProps> = ({ executionLogs, executionDebug }) => {
   const [logs, setLogs] = useState(logger.getLogs());
   const [showLogs, setShowLogs] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'console' | 'cairo' | 'prover' | 'rust'>('console');
+  const [selectedTab, setSelectedTab] = useState<'console' | 'cairo' | 'prover' | 'rust' | 'debug'>('console');
 
   useEffect(() => {
     const updateLogs = (newLogs: any) => setLogs(newLogs);
@@ -82,6 +83,14 @@ export const LogViewer: React.FC<LogViewerProps> = ({ executionLogs }) => {
                 >
                   Rust Host Output
                 </button>
+                <button
+                  onClick={() => setSelectedTab('debug')}
+                  className={`px-4 py-2 text-sm transition-colors ${
+                    selectedTab === 'debug' ? 'bg-zk-bg text-zk-accent' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Debug Info
+                </button>
               </>
             )}
           </div>
@@ -111,6 +120,53 @@ export const LogViewer: React.FC<LogViewerProps> = ({ executionLogs }) => {
               <pre className="text-gray-300 whitespace-pre-wrap">
                 {executionLogs.rustHostOutput || 'No Rust host output'}
               </pre>
+            ) : selectedTab === 'debug' && executionDebug ? (
+              <div className="space-y-4 text-gray-300">
+                {executionDebug.asmContent && (
+                  <div>
+                    <div className="text-zk-accent font-bold mb-1">Generated ASM Content:</div>
+                    <pre className="bg-gray-900 p-2 rounded text-xs">
+                      {executionDebug.asmContent}
+                    </pre>
+                  </div>
+                )}
+                {executionDebug.command && (
+                  <div>
+                    <div className="text-zk-accent font-bold mb-1">Command:</div>
+                    <pre className="bg-gray-900 p-2 rounded text-xs">
+                      {executionDebug.command}
+                    </pre>
+                  </div>
+                )}
+                {executionDebug.workingDir && (
+                  <div>
+                    <div className="text-gray-400">Working Directory:</div>
+                    <div className="text-xs">{executionDebug.workingDir}</div>
+                  </div>
+                )}
+                {executionDebug.shell && (
+                  <div>
+                    <div className="text-gray-400">Shell:</div>
+                    <div className="text-xs">{executionDebug.shell}</div>
+                  </div>
+                )}
+                {executionDebug.execError && (
+                  <div>
+                    <div className="text-red-400 font-bold mb-1">Execution Error:</div>
+                    <pre className="bg-red-900 bg-opacity-20 p-2 rounded text-xs">
+                      {JSON.stringify(executionDebug.execError, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                {executionDebug.errorStack && (
+                  <div>
+                    <div className="text-red-400 font-bold mb-1">Error Stack:</div>
+                    <pre className="bg-red-900 bg-opacity-20 p-2 rounded text-xs">
+                      {executionDebug.errorStack}
+                    </pre>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="text-gray-600">No output available</div>
             )}

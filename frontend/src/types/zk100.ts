@@ -39,10 +39,27 @@ export type ExecutionLogs = {
   rustHostOutput: string;
 };
 
+export type ExecutionDebug = {
+  asmContent?: string;
+  command?: string;
+  workingDir?: string;
+  shell?: string;
+  tempFile?: string;
+  execError?: {
+    message: string;
+    code?: number;
+    killed?: boolean;
+    signal?: string;
+  };
+  errorStack?: string;
+  nodes?: any;
+};
+
 export type ExecutionResult = {
   success: boolean;
   output?: number[];
   error?: string;
   executionTime?: number;
   logs?: ExecutionLogs;
+  debug?: ExecutionDebug;
 };

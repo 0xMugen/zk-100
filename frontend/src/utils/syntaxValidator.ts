@@ -102,8 +102,8 @@ export function validateLine(line: string, nodePosition: NodePosition): CodeLine
   if (instruction === 'MOV') {
     const [src, dst] = operands;
     
-    // Can't move to ACC or NIL as destination
-    if (dst === 'ACC' || dst === 'NIL') {
+    // Can't move to NIL as destination
+    if (dst === 'NIL') {
       return {
         instruction: instruction as Instruction,
         operands,
