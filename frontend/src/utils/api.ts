@@ -17,6 +17,7 @@ interface DebugResponse {
   };
   argsJson?: string;
   asmContent?: string;
+  scarbOutput?: string;
   error?: string;
 }
 
@@ -105,6 +106,11 @@ export async function executeProgram(nodes: Node[], inputs?: number[]): Promise<
       }
       
       // Add debug information
+      if (data.scarbOutput) {
+        errorMessage += '=== Scarb Output ===\n';
+        errorMessage += data.scarbOutput + '\n\n';
+      }
+      
       if (data.argsJson) {
         errorMessage += '=== Generated args.json ===\n';
         errorMessage += data.argsJson + '\n\n';
@@ -130,8 +136,28 @@ export async function executeProgram(nodes: Node[], inputs?: number[]): Promise<
     // Extract outputs from traces
     const output: number[] = [];
     
-    // Try to find outputs in the scarb trace
-    if (data.traces?.scarb) {
+    // First try to parse scarb output directly
+    if (data.scarbOutput) {
+      const lines = data.scarbOutput.split('\n');
+      for (const line of lines) {
+        if (line.includes('Run completed successfully')) {
+          // Look for the array output format
+          const arrayMatch = line.match(/\[([^\]]+)\]/);
+          if (arrayMatch) {
+            const values = arrayMatch[1].split(',').map(v => v.trim());
+            values.forEach(v => {
+              const num = parseInt(v);
+              if (!isNaN(num)) {
+                output.push(num);
+              }
+            });
+          }
+        }
+      }
+    }
+    
+    // If no outputs found, try traces
+    if (output.length === 0 && data.traces?.scarb) {
       // Look in finalState first
       if (data.traces.scarb.finalState?.outputs) {
         const outputStr = data.traces.scarb.finalState.outputs;

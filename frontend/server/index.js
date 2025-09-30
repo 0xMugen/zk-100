@@ -200,24 +200,32 @@ app.post('/api/debug', async (req, res) => {
       );
       
       try {
-        const { stdout, stderr } = await execAsync(
-          'RUST_LOG=trace scarb execute --arguments-file args.json --print-program-output',
-          {
-            cwd: execDir,
-            timeout: 30000,
-            maxBuffer: 1024 * 1024 * 10,
-            shell: SHELL,
-            env: { ...process.env, RUST_LOG: 'trace' }
-          }
-        );
+        // Change to exec directory and run scarb execute
+        const scarbCommand = `cd ${execDir} && scarb execute --arguments-file args.json --print-program-output`;
+        console.log('Running:', scarbCommand);
+        console.log('Exec directory:', execDir);
+        
+        const { stdout, stderr } = await execAsync(scarbCommand, {
+          timeout: 30000,
+          maxBuffer: 1024 * 1024 * 10,
+          shell: SHELL,
+          env: { ...process.env }
+        });
         
         results.scarbTrace = extractTrace(stdout + '\n' + stderr);
+        console.log('Scarb stdout:', stdout);
+        console.log('Scarb stderr:', stderr);
         console.log('Scarb execute completed');
         
+        // Also store the raw output for debugging
+        results.scarbOutput = stdout;
+        
       } catch (error) {
-        results.scarbError = error.message;
+        results.scarbError = error.message + '\n\nStdout:\n' + error.stdout + '\n\nStderr:\n' + error.stderr;
         results.scarbTrace = extractTrace((error.stdout || '') + '\n' + (error.stderr || ''));
         console.error('Scarb execute failed:', error.message);
+        console.error('Stdout:', error.stdout);
+        console.error('Stderr:', error.stderr);
       }
     }
     
@@ -264,7 +272,8 @@ app.post('/api/debug', async (req, res) => {
         prove: results.proveError
       },
       argsJson: results.argsJson,
-      asmContent: asmContent
+      asmContent: asmContent,
+      scarbOutput: results.scarbOutput
     });
     
   } catch (error) {
