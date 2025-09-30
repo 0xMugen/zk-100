@@ -76,22 +76,26 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ result, isExecutin
 
         {/* Show Scarb Output */}
         {result.debug?.scarbOutput && (
-          <div className="mt-4">
-            <h4 className="text-gray-400 mb-2">Cairo Execution Output:</h4>
-            <pre className="bg-black/50 rounded p-3 text-xs text-gray-300 overflow-x-auto max-h-40">
+          <details className="mt-4">
+            <summary className="cursor-pointer text-gray-400 hover:text-white mb-2">
+              Cairo Execution Output
+            </summary>
+            <pre className="bg-black/50 rounded p-3 text-xs text-gray-300 overflow-x-auto max-h-40 mt-2">
               {result.debug.scarbOutput}
             </pre>
-          </div>
+          </details>
         )}
 
         {/* Show Prove Output if available */}
         {result.debug?.proveOutput && (
-          <div className="mt-4">
-            <h4 className="text-gray-400 mb-2">Proof Generation Output:</h4>
-            <pre className="bg-black/50 rounded p-3 text-xs text-gray-300 overflow-x-auto max-h-40">
+          <details className="mt-4">
+            <summary className="cursor-pointer text-gray-400 hover:text-white mb-2">
+              Proof Generation Output
+            </summary>
+            <pre className="bg-black/50 rounded p-3 text-xs text-gray-300 overflow-x-auto max-h-40 mt-2">
               {result.debug.proveOutput}
             </pre>
-          </div>
+          </details>
         )}
 
         {/* Show debug traces if available */}
