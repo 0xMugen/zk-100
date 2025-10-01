@@ -60,6 +60,11 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ result, isExecutin
                   {result.debug.publicOutputs.solved ? "✓ Yes" : "✗ No"}
                 </span></div>
               </div>
+              {result.debug.publicOutputs.outputs && result.debug.publicOutputs.outputs.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-700">
+                  <div className="text-gray-300">Output: <span className="text-white font-mono">[{result.debug.publicOutputs.outputs.join(', ')}]</span></div>
+                </div>
+              )}
               {result.success && (
                 <div className="mt-2 text-xs text-green-400">
                   ✓ These results have been cryptographically proven

@@ -19,7 +19,16 @@ interface DebugResponse {
   asmContent?: string;
   scarbOutput?: string;
   proveOutput?: string;
-  publicOutputs?: any;
+  publicOutputs?: {
+    challenge_commit: string | null;
+    program_commit: string | null;
+    output_commit: string | null;
+    cycles: number;
+    msgs: number;
+    nodes_used: number;
+    solved: boolean;
+    outputs: number[];
+  };
   error?: string;
 }
 
@@ -44,10 +53,6 @@ function generateAsmContent(nodes: Node[]): string {
           trimmed = trimmed.replace(/MOV\s+(\S+)\s+(\S+)/, 'MOV $1, $2');
           asm += `${trimmed}\n`;
         }
-      }
-      // Add HLT if not present
-      if (!code.includes('HLT')) {
-        asm += `HLT\n`;
       }
       asm += '\n';
     }

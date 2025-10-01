@@ -60,10 +60,6 @@ function generateAsmContent(nodes) {
           asm += `${trimmed}\n`;
         }
       }
-      // Add HLT if not present
-      if (!code.includes('HLT')) {
-        asm += `HLT\n`;
-      }
       asm += '\n';
     }
   }
@@ -80,10 +76,21 @@ function parsePublicOutputs(output) {
     cycles: 0,
     msgs: 0,
     nodes_used: 0,
-    solved: false
+    solved: false,
+    outputs: []
   };
   
   const lines = output.split('\n');
+  
+  // First, look for output values in the execution trace
+  const outputIndex = lines.findIndex(line => line.includes('Output:'));
+  if (outputIndex !== -1) {
+    const outputMatch = lines[outputIndex].match(/Output:\s*\[([^\]]+)\]/);
+    if (outputMatch) {
+      result.outputs = outputMatch[1].split(',').map(v => parseInt(v.trim()));
+    }
+  }
+  
   const programOutputIndex = lines.findIndex(line => line.includes('Program output:'));
   
   if (programOutputIndex !== -1 && programOutputIndex + 8 < lines.length) {
@@ -200,7 +207,10 @@ app.post('/api/debug', async (req, res) => {
     
     if (inputs && inputs.length > 0) {
       // For now, use the same values for expected as inputs (game wants input=output)
-      assembleCommand += ` -i ${inputs.join(',')} -e ${inputs.join(',')}`;
+      // Use = syntax to avoid issues with negative numbers being parsed as flags
+      const inputStr = inputs.join(',');
+      const expectedStr = inputs.join(',');
+      assembleCommand += ` --inputs="${inputStr}" --expected="${expectedStr}"`;
     }
     
     try {
