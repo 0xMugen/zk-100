@@ -143,7 +143,8 @@ fn execute_instruction_with_ports(grid: @GridState, node: @NodeState, inst: Inst
             new_node.pc += 1;
         },
         Op::Hlt => {
-            new_node.halted = true;
+            // For auto-looping behavior, HLT acts like NOP
+            new_node.pc += 1;
         },
         Op::Mov => {
             match read_source_with_ports(grid, @new_node, inst.src, r, c, port_match) {
@@ -351,7 +352,13 @@ fn get_port_intent(grid: @GridState, node: @NodeState, r: u32, c: u32) -> Option
     // Fetch instruction
     match get_program(grid, r, c) {
         Option::Some(prog) => {
-            match prog.get((*node).pc) {
+            // Auto-wrap PC if program is not empty
+            let pc_wrapped = if prog.len() > 0 {
+                (*node).pc % prog.len()
+            } else {
+                0
+            };
+            match prog.get(pc_wrapped) {
                 Option::Some(inst_box) => {
                     let inst = *inst_box.unbox();
                     
@@ -470,7 +477,13 @@ fn execute_node_with_ports(grid: @GridState, node: @NodeState, r: u32, c: u32, p
     // Execute the instruction with port match info
     match get_program(grid, r, c) {
         Option::Some(prog) => {
-            match prog.get((*node).pc) {
+            // Auto-wrap PC if program is not empty
+            let pc_wrapped = if prog.len() > 0 {
+                (*node).pc % prog.len()
+            } else {
+                0
+            };
+            match prog.get(pc_wrapped) {
                 Option::Some(inst_box) => {
                     let inst = *inst_box.unbox();
                     execute_instruction_with_ports(grid, node, inst, r, c, port_match)

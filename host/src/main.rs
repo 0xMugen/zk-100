@@ -90,7 +90,10 @@ fn parse_u32_array(s: &str) -> Vec<u32> {
         return vec![];
     }
     s.split(',')
-        .filter_map(|v| v.trim().parse::<u32>().ok())
+        .filter_map(|v| {
+            // Parse as i32 first to handle negative numbers, then convert to u32
+            v.trim().parse::<i32>().ok().map(|n| n as u32)
+        })
         .collect()
 }
 
