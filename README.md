@@ -1,4 +1,4 @@
-# ZK-100 — Zero Knowledge Proof Game
+# ZK-100 Zero Knowledge Proof Game
 
 ## Overview
 
