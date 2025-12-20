@@ -320,3 +320,7 @@ HLT
 - **Cairo VM**: Executes programs with cryptographic constraints
 - **STWO Prover**: Generates zero-knowledge proofs of execution
 - **Frontend**: Visual interface for program development
+
+### License
+
+MIT baby
