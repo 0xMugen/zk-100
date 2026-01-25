@@ -321,6 +321,10 @@ HLT
 - **STWO Prover**: Generates zero-knowledge proofs of execution
 - **Frontend**: Visual interface for program development
 
+### todos
+
+- **efficient proving**
+
 ### License
 
 MIT baby
